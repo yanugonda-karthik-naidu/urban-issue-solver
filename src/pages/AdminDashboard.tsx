@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { auth, db } from '@/lib/firebase';
-import { collection, query, onSnapshot, doc, updateDoc } from 'firebase/firestore';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -14,12 +13,16 @@ interface Issue {
   title: string;
   description: string;
   category: string;
-  status: 'pending' | 'inProgress' | 'resolved';
-  createdAt: any;
-  location: string;
-  photoUrl?: string;
-  userName?: string;
-  userEmail?: string;
+  status: 'pending' | 'in_progress' | 'resolved';
+  created_at: string;
+  area: string | null;
+  district: string | null;
+  state: string | null;
+  photo_url: string | null;
+  profiles?: {
+    full_name: string | null;
+    email: string | null;
+  };
 }
 
 export default function AdminDashboard() {
@@ -27,33 +30,88 @@ export default function AdminDashboard() {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
-  const user = auth.currentUser;
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    if (!user) {
-      navigate('/login');
-      return;
+    const checkAdminAndFetch = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (!session) {
+        navigate('/login');
+        return;
+      }
+
+      // Check if user is admin
+      const { data: adminData } = await supabase
+        .from('admins')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .single();
+
+      if (!adminData) {
+        toast.error('Access denied. Admin privileges required.');
+        navigate('/dashboard');
+        return;
+      }
+
+      setIsAdmin(true);
+      fetchIssues();
+    };
+
+    checkAdminAndFetch();
+  }, [navigate]);
+
+  const fetchIssues = async () => {
+    const { data, error } = await supabase
+      .from('issues')
+      .select(`
+        *,
+        profiles:user_id (
+          full_name,
+          email
+        )
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      toast.error('Failed to load issues');
+    } else {
+      setIssues((data as any[]) || []);
     }
+    setLoading(false);
+  };
 
-    const q = query(collection(db, 'issues'));
+  useEffect(() => {
+    if (!isAdmin) return;
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const issuesData: Issue[] = [];
-      snapshot.forEach((doc) => {
-        issuesData.push({ id: doc.id, ...doc.data() } as Issue);
-      });
-      setIssues(issuesData.sort((a, b) => b.createdAt?.seconds - a.createdAt?.seconds));
-      setLoading(false);
-    });
+    const channel = supabase
+      .channel('admin-issues-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'issues',
+        },
+        () => {
+          fetchIssues();
+        }
+      )
+      .subscribe();
 
-    return () => unsubscribe();
-  }, [user, navigate]);
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isAdmin]);
 
   const updateStatus = async (issueId: string, newStatus: string) => {
     try {
-      await updateDoc(doc(db, 'issues', issueId), {
-        status: newStatus
-      });
+      const { error } = await supabase
+        .from('issues')
+        .update({ status: newStatus })
+        .eq('id', issueId);
+
+      if (error) throw error;
       toast.success('Status updated successfully!');
     } catch (error) {
       toast.error('Failed to update status');
@@ -64,7 +122,7 @@ export default function AdminDashboard() {
     switch (status) {
       case 'pending':
         return <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
-      case 'inProgress':
+      case 'in_progress':
         return <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20"><AlertCircle className="h-3 w-3 mr-1" />In Progress</Badge>;
       case 'resolved':
         return <Badge variant="outline" className="bg-success/10 text-success border-success/20"><CheckCircle2 className="h-3 w-3 mr-1" />Resolved</Badge>;
@@ -76,9 +134,13 @@ export default function AdminDashboard() {
   const stats = {
     total: issues.length,
     pending: issues.filter(i => i.status === 'pending').length,
-    inProgress: issues.filter(i => i.status === 'inProgress').length,
+    inProgress: issues.filter(i => i.status === 'in_progress').length,
     resolved: issues.filter(i => i.status === 'resolved').length,
   };
+
+  if (!isAdmin) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gradient-card">
@@ -92,7 +154,7 @@ export default function AdminDashboard() {
             <SelectContent>
               <SelectItem value="all">All Issues</SelectItem>
               <SelectItem value="pending">Pending</SelectItem>
-              <SelectItem value="inProgress">In Progress</SelectItem>
+              <SelectItem value="in_progress">In Progress</SelectItem>
               <SelectItem value="resolved">Resolved</SelectItem>
             </SelectContent>
           </Select>
@@ -162,15 +224,21 @@ export default function AdminDashboard() {
                     <div>
                       <h3 className="text-lg font-semibold mb-1">{issue.title}</h3>
                       <p className="text-sm text-muted-foreground">{issue.category}</p>
-                      <p className="text-sm text-muted-foreground">{issue.userName} ({issue.userEmail})</p>
+                      <p className="text-sm text-muted-foreground">
+                        {issue.profiles?.full_name || 'Unknown'} ({issue.profiles?.email || 'N/A'})
+                      </p>
                     </div>
                     {getStatusBadge(issue.status)}
                   </div>
                   <p className="text-sm mb-2">{issue.description}</p>
-                  <p className="text-sm text-muted-foreground mb-4">{issue.location}</p>
-                  {issue.photoUrl && (
+                  <p className="text-sm text-muted-foreground mb-4">
+                    {issue.area && issue.district && issue.state
+                      ? `${issue.area}, ${issue.district}, ${issue.state}`
+                      : 'Location not specified'}
+                  </p>
+                  {issue.photo_url && (
                     <img 
-                      src={issue.photoUrl} 
+                      src={issue.photo_url} 
                       alt={issue.title}
                       className="mb-4 rounded-lg max-h-48 w-auto object-cover"
                     />
@@ -187,8 +255,8 @@ export default function AdminDashboard() {
                     <Button 
                       variant="default" 
                       size="sm"
-                      onClick={() => updateStatus(issue.id, 'inProgress')}
-                      disabled={issue.status === 'inProgress'}
+                      onClick={() => updateStatus(issue.id, 'in_progress')}
+                      disabled={issue.status === 'in_progress'}
                     >
                       Mark In Progress
                     </Button>

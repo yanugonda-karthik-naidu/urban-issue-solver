@@ -1,8 +1,7 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { auth, db } from '@/lib/firebase';
-import { collection, addDoc, serverTimestamp } from 'firebase/firestore';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -16,26 +15,38 @@ export default function ReportIssue() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [userId, setUserId] = useState<string | null>(null);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
     category: '',
-    location: '',
-    photoUrl: ''
+    area: '',
+    district: '',
+    state: '',
+    latitude: null as number | null,
+    longitude: null as number | null,
   });
 
-  const user = auth.currentUser;
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        navigate('/login');
+      } else {
+        setUserId(session.user.id);
+      }
+    });
+  }, [navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!user) {
+    if (!userId) {
       toast.error('Please login to report an issue');
       navigate('/login');
       return;
     }
 
-    if (!formData.title || !formData.description || !formData.category || !formData.location) {
+    if (!formData.title || !formData.description || !formData.category) {
       toast.error('Please fill all required fields');
       return;
     }
@@ -43,14 +54,20 @@ export default function ReportIssue() {
     setLoading(true);
 
     try {
-      await addDoc(collection(db, 'issues'), {
-        ...formData,
-        userId: user.uid,
-        userEmail: user.email,
-        userName: user.displayName,
+      const { error } = await supabase.from('issues').insert({
+        user_id: userId,
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        area: formData.area || null,
+        district: formData.district || null,
+        state: formData.state || null,
+        latitude: formData.latitude,
+        longitude: formData.longitude,
         status: 'pending',
-        createdAt: serverTimestamp(),
       });
+
+      if (error) throw error;
 
       toast.success('Issue reported successfully!');
       navigate('/dashboard');
@@ -66,8 +83,12 @@ export default function ReportIssue() {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const { latitude, longitude } = position.coords;
-          setFormData({ ...formData, location: `${latitude}, ${longitude}` });
-          toast.success('Location detected!');
+          setFormData({ 
+            ...formData, 
+            latitude, 
+            longitude,
+          });
+          toast.success('Location detected! Add area, district, and state manually.');
         },
         (error) => {
           toast.error('Failed to get location');
@@ -126,20 +147,50 @@ export default function ReportIssue() {
                 />
               </div>
 
-              <div>
-                <Label htmlFor="location">{t('report.location')}</Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="location"
-                    value={formData.location}
-                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
-                    placeholder={t('report.location')}
-                    required
-                  />
-                  <Button type="button" variant="outline" onClick={getLocation}>
-                    <MapPin className="h-4 w-4" />
+              <div className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <Label>Location</Label>
+                  <Button type="button" variant="outline" size="sm" onClick={getLocation}>
+                    <MapPin className="h-4 w-4 mr-1" />
+                    Auto-detect GPS
                   </Button>
                 </div>
+                
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="area">Area</Label>
+                    <Input
+                      id="area"
+                      value={formData.area}
+                      onChange={(e) => setFormData({ ...formData, area: e.target.value })}
+                      placeholder="Area"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="district">District</Label>
+                    <Input
+                      id="district"
+                      value={formData.district}
+                      onChange={(e) => setFormData({ ...formData, district: e.target.value })}
+                      placeholder="District"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="state">State</Label>
+                    <Input
+                      id="state"
+                      value={formData.state}
+                      onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                      placeholder="State"
+                    />
+                  </div>
+                </div>
+
+                {formData.latitude && formData.longitude && (
+                  <p className="text-xs text-muted-foreground">
+                    GPS: {formData.latitude.toFixed(6)}, {formData.longitude.toFixed(6)}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -151,7 +202,7 @@ export default function ReportIssue() {
                   </Button>
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
-                  Photo upload via Cloudinary coming soon
+                  Photo upload coming soon
                 </p>
               </div>
 

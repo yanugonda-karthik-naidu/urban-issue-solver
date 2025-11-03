@@ -1,8 +1,10 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Link } from 'react-router-dom';
-import { Menu, X, Globe } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { Menu, X, Globe, LogOut } from 'lucide-react';
 import { Button } from './ui/button';
+import { supabase } from '@/integrations/supabase/client';
+import { toast } from 'sonner';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,10 +14,30 @@ import {
 
 export const Header = () => {
   const { t, i18n } = useTranslation();
+  const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [user, setUser] = useState<any>(null);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const changeLanguage = (lng: string) => {
     i18n.changeLanguage(lng);
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    toast.success('Logged out successfully');
+    navigate('/');
   };
 
   return (
@@ -33,15 +55,19 @@ export const Header = () => {
           <Link to="/" className="text-sm font-medium hover:text-primary transition-colors">
             {t('nav.home')}
           </Link>
-          <Link to="/report" className="text-sm font-medium hover:text-primary transition-colors">
-            {t('nav.report')}
-          </Link>
-          <Link to="/dashboard" className="text-sm font-medium hover:text-primary transition-colors">
-            {t('nav.dashboard')}
-          </Link>
-          <Link to="/admin" className="text-sm font-medium hover:text-primary transition-colors">
-            {t('nav.admin')}
-          </Link>
+          {user && (
+            <>
+              <Link to="/report" className="text-sm font-medium hover:text-primary transition-colors">
+                {t('nav.report')}
+              </Link>
+              <Link to="/dashboard" className="text-sm font-medium hover:text-primary transition-colors">
+                {t('nav.dashboard')}
+              </Link>
+              <Link to="/admin" className="text-sm font-medium hover:text-primary transition-colors">
+                {t('nav.admin')}
+              </Link>
+            </>
+          )}
           
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -59,9 +85,16 @@ export const Header = () => {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Link to="/login">
-            <Button>{t('nav.login')}</Button>
-          </Link>
+          {user ? (
+            <Button variant="outline" onClick={handleLogout}>
+              <LogOut className="mr-2 h-4 w-4" />
+              Logout
+            </Button>
+          ) : (
+            <Link to="/login">
+              <Button>{t('nav.login')}</Button>
+            </Link>
+          )}
         </div>
 
         {/* Mobile Menu Button */}
@@ -80,18 +113,29 @@ export const Header = () => {
             <Link to="/" className="text-sm font-medium hover:text-primary transition-colors">
               {t('nav.home')}
             </Link>
-            <Link to="/report" className="text-sm font-medium hover:text-primary transition-colors">
-              {t('nav.report')}
-            </Link>
-            <Link to="/dashboard" className="text-sm font-medium hover:text-primary transition-colors">
-              {t('nav.dashboard')}
-            </Link>
-            <Link to="/admin" className="text-sm font-medium hover:text-primary transition-colors">
-              {t('nav.admin')}
-            </Link>
-            <Link to="/login">
-              <Button className="w-full">{t('nav.login')}</Button>
-            </Link>
+            {user && (
+              <>
+                <Link to="/report" className="text-sm font-medium hover:text-primary transition-colors">
+                  {t('nav.report')}
+                </Link>
+                <Link to="/dashboard" className="text-sm font-medium hover:text-primary transition-colors">
+                  {t('nav.dashboard')}
+                </Link>
+                <Link to="/admin" className="text-sm font-medium hover:text-primary transition-colors">
+                  {t('nav.admin')}
+                </Link>
+              </>
+            )}
+            {user ? (
+              <Button variant="outline" onClick={handleLogout} className="w-full">
+                <LogOut className="mr-2 h-4 w-4" />
+                Logout
+              </Button>
+            ) : (
+              <Link to="/login">
+                <Button className="w-full">{t('nav.login')}</Button>
+              </Link>
+            )}
           </div>
         </div>
       )}

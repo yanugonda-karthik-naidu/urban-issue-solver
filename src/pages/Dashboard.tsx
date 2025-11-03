@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
-import { auth, db } from '@/lib/firebase';
-import { collection, query, where, getDocs, onSnapshot } from 'firebase/firestore';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -13,10 +12,12 @@ interface Issue {
   id: string;
   title: string;
   category: string;
-  status: 'pending' | 'inProgress' | 'resolved';
-  createdAt: any;
-  location: string;
-  photoUrl?: string;
+  status: 'pending' | 'in_progress' | 'resolved';
+  created_at: string;
+  area: string | null;
+  district: string | null;
+  state: string | null;
+  photo_url: string | null;
 }
 
 export default function Dashboard() {
@@ -24,36 +25,74 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
-  const user = auth.currentUser;
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-
-    const q = query(
-      collection(db, 'issues'),
-      where('userId', '==', user.uid)
-    );
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const issuesData: Issue[] = [];
-      snapshot.forEach((doc) => {
-        issuesData.push({ id: doc.id, ...doc.data() } as Issue);
-      });
-      setIssues(issuesData.sort((a, b) => b.createdAt?.seconds - a.createdAt?.seconds));
-      setLoading(false);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) {
+        navigate('/login');
+      } else {
+        setUserId(session.user.id);
+      }
     });
 
-    return () => unsubscribe();
-  }, [user, navigate]);
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!session) {
+        navigate('/login');
+      } else {
+        setUserId(session.user.id);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [navigate]);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    const fetchIssues = async () => {
+      const { data, error } = await supabase
+        .from('issues')
+        .select('*')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        toast.error('Failed to load issues');
+      } else {
+        setIssues((data as Issue[]) || []);
+      }
+      setLoading(false);
+    };
+
+    fetchIssues();
+
+    const channel = supabase
+      .channel('issues-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'issues',
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          fetchIssues();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
         return <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20"><Clock className="h-3 w-3 mr-1" />{t('status.pending')}</Badge>;
-      case 'inProgress':
+      case 'in_progress':
         return <Badge variant="outline" className="bg-primary/10 text-primary border-primary/20"><AlertCircle className="h-3 w-3 mr-1" />{t('status.inProgress')}</Badge>;
       case 'resolved':
         return <Badge variant="outline" className="bg-success/10 text-success border-success/20"><CheckCircle2 className="h-3 w-3 mr-1" />{t('status.resolved')}</Badge>;
@@ -63,7 +102,7 @@ export default function Dashboard() {
   const stats = {
     total: issues.length,
     pending: issues.filter(i => i.status === 'pending').length,
-    inProgress: issues.filter(i => i.status === 'inProgress').length,
+    inProgress: issues.filter(i => i.status === 'in_progress').length,
     resolved: issues.filter(i => i.status === 'resolved').length,
   };
 
@@ -146,10 +185,14 @@ export default function Dashboard() {
                     {getStatusBadge(issue.status)}
                   </div>
                   <p className="text-sm text-muted-foreground mb-2">{issue.category}</p>
-                  <p className="text-sm text-muted-foreground">{issue.location}</p>
-                  {issue.photoUrl && (
+                  <p className="text-sm text-muted-foreground">
+                    {issue.area && issue.district && issue.state
+                      ? `${issue.area}, ${issue.district}, ${issue.state}`
+                      : 'Location not specified'}
+                  </p>
+                  {issue.photo_url && (
                     <img 
-                      src={issue.photoUrl} 
+                      src={issue.photo_url} 
                       alt={issue.title}
                       className="mt-4 rounded-lg max-h-48 w-auto object-cover"
                     />
