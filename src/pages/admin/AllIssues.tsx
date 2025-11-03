@@ -114,6 +114,7 @@ export default function AllIssues() {
   useEffect(() => {
     if (!isAdmin) return;
 
+    // Set up real-time subscription for automatic updates
     const channel = supabase
       .channel('admin-all-issues-changes')
       .on(
@@ -123,8 +124,15 @@ export default function AllIssues() {
           schema: 'public',
           table: 'issues',
         },
-        () => {
+        (payload) => {
+          console.log('Real-time update received:', payload);
+          // Fetch fresh data whenever any change occurs
           fetchIssues();
+          
+          // Show notification for new issues
+          if (payload.eventType === 'INSERT') {
+            toast.info('New issue reported!');
+          }
         }
       )
       .subscribe();

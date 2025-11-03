@@ -79,8 +79,9 @@ export default function Dashboard() {
 
     fetchIssues();
 
+    // Set up real-time subscription for automatic updates from admin
     const channel = supabase
-      .channel('issues-changes')
+      .channel('user-issues-changes')
       .on(
         'postgres_changes',
         {
@@ -89,8 +90,15 @@ export default function Dashboard() {
           table: 'issues',
           filter: `user_id=eq.${userId}`,
         },
-        () => {
+        (payload) => {
+          console.log('Real-time update received:', payload);
+          // Fetch fresh data whenever admin makes changes
           fetchIssues();
+          
+          // Show notification when admin updates status or remarks
+          if (payload.eventType === 'UPDATE') {
+            toast.success('Your issue has been updated by admin');
+          }
         }
       )
       .subscribe();

@@ -123,6 +123,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     if (!isAdmin) return;
 
+    // Set up real-time subscription for automatic updates
     const channel = supabase
       .channel('admin-dashboard-changes')
       .on(
@@ -132,7 +133,9 @@ export default function AdminDashboard() {
           schema: 'public',
           table: 'issues',
         },
-        () => {
+        (payload) => {
+          console.log('Real-time update received:', payload);
+          // Fetch fresh data whenever any change occurs
           fetchDashboardData();
         }
       )

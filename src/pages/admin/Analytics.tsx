@@ -129,6 +129,32 @@ export default function Analytics() {
     }
   };
 
+  // Set up real-time updates for analytics
+  useEffect(() => {
+    if (!isAdmin) return;
+
+    const channel = supabase
+      .channel('admin-analytics-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'issues',
+        },
+        (payload) => {
+          console.log('Analytics update:', payload);
+          // Refetch analytics when data changes
+          fetchAnalyticsData();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [isAdmin]);
+
   if (!isAdmin) {
     return null;
   }
