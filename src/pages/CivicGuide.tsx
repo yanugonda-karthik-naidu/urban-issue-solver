@@ -5,12 +5,14 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
-import { Send, MapPin, Bot } from 'lucide-react';
+import { Send, MapPin, Bot, Image as ImageIcon, X } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { uploadToCloudinary } from '@/lib/cloudinary';
 
 type Message = {
   role: 'user' | 'assistant';
   content: string;
+  imageUrl?: string;
 };
 
 type LocationData = {
@@ -30,7 +32,10 @@ export default function CivicGuide() {
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
   const [location, setLocation] = useState<LocationData | null>(null);
+  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -38,6 +43,8 @@ export default function CivicGuide() {
         navigate('/login');
       } else {
         setUserId(session.user.id);
+        // Automatically get location on mount
+        getLocation();
       }
     });
   }, [navigate]);
@@ -46,43 +53,100 @@ export default function CivicGuide() {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  const getLocation = () => {
+  const getLocation = async () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
-        (position) => {
+        async (position) => {
           const { latitude, longitude } = position.coords;
-          setLocation({
-            area: '',
-            district: '',
-            state: '',
-            latitude,
-            longitude,
-          });
-          toast.success('Location detected! Please provide area, district, and state details.');
+          
+          // Reverse geocoding to get address details
+          try {
+            const response = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+            );
+            const data = await response.json();
+            
+            const locationData = {
+              area: data.address.suburb || data.address.neighbourhood || data.address.road || '',
+              district: data.address.city || data.address.town || data.address.county || '',
+              state: data.address.state || '',
+              latitude,
+              longitude,
+            };
+            
+            setLocation(locationData);
+            toast.success(`📍 Location detected: ${locationData.area}, ${locationData.district}, ${locationData.state}`);
+          } catch (error) {
+            setLocation({
+              area: '',
+              district: '',
+              state: '',
+              latitude,
+              longitude,
+            });
+            toast.success('📍 Location coordinates detected!');
+          }
         },
         () => {
-          toast.error('Failed to get location');
+          toast.error('Failed to get location. Please enable location access.');
         }
       );
     } else {
-      toast.error('Geolocation not supported');
+      toast.error('Geolocation not supported by your browser');
     }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploading(true);
+    try {
+      const uploadPromises = Array.from(files).map(file => uploadToCloudinary(file));
+      const urls = await Promise.all(uploadPromises);
+      
+      setUploadedImages(prev => [...prev, ...urls]);
+      toast.success(`✅ ${urls.length} image(s) uploaded successfully!`);
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast.error(error.message || 'Failed to upload images');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setUploadedImages(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || loading) return;
+    if ((!input.trim() && uploadedImages.length === 0) || loading) return;
 
-    const userMessage: Message = { role: 'user', content: input };
+    const userMessage: Message = { 
+      role: 'user', 
+      content: input || '📷 Image uploaded',
+      imageUrl: uploadedImages.length > 0 ? uploadedImages[0] : undefined
+    };
+    
+    // Add user message with images to chat
     setMessages(prev => [...prev, userMessage]);
     setInput('');
     setLoading(true);
 
     try {
+      const messageContent = uploadedImages.length > 0 
+        ? `${input}\n\n[User uploaded ${uploadedImages.length} image(s). Image URLs: ${uploadedImages.join(', ')}]`
+        : input;
+
       const { data, error } = await supabase.functions.invoke('civic-guide-chat', {
         body: {
-          messages: [...messages, userMessage],
-          userLocation: location
+          messages: [...messages, { role: 'user', content: messageContent }],
+          userLocation: location,
+          images: uploadedImages
         }
       });
 
@@ -133,12 +197,17 @@ export default function CivicGuide() {
         state: data.state || location?.state || null,
         latitude: location?.latitude,
         longitude: location?.longitude,
+        photo_url: uploadedImages[0] || null,
         status: 'pending',
       });
 
       if (error) throw error;
 
       toast.success('✅ Issue reported successfully! Redirecting to dashboard...');
+      
+      // Clear images after successful submission
+      setUploadedImages([]);
+      
       setTimeout(() => navigate('/dashboard'), 2000);
     } catch (error: any) {
       toast.error(error.message || 'Failed to report issue');
@@ -190,6 +259,13 @@ export default function CivicGuide() {
                       : 'bg-muted'
                   }`}
                 >
+                  {message.imageUrl && (
+                    <img 
+                      src={message.imageUrl} 
+                      alt="Uploaded" 
+                      className="rounded-lg mb-2 max-w-full h-auto max-h-48 object-cover"
+                    />
+                  )}
                   <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                 </div>
               </div>
@@ -205,20 +281,61 @@ export default function CivicGuide() {
           </CardContent>
 
           <div className="border-t p-4">
+            {uploadedImages.length > 0 && (
+              <div className="mb-3 flex gap-2 flex-wrap">
+                {uploadedImages.map((url, index) => (
+                  <div key={index} className="relative group">
+                    <img 
+                      src={url} 
+                      alt={`Upload ${index + 1}`} 
+                      className="h-20 w-20 object-cover rounded-lg border"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeImage(index)}
+                      className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+            
             <form onSubmit={handleSubmit} className="flex gap-2">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/*"
+                multiple
+                onChange={handleImageUpload}
+                className="hidden"
+              />
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploading || loading}
+              >
+                <ImageIcon className="h-4 w-4" />
+              </Button>
               <Input
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
-                placeholder="Type your message..."
+                placeholder="Type your message or upload an image..."
                 disabled={loading}
                 className="flex-1"
               />
-              <Button type="submit" disabled={loading || !input.trim()}>
+              <Button 
+                type="submit" 
+                disabled={loading || (!input.trim() && uploadedImages.length === 0)}
+              >
                 <Send className="h-4 w-4" />
               </Button>
             </form>
             <p className="text-xs text-muted-foreground mt-2 text-center">
-              Tip: You can type in any language - English, Hindi, Telugu, Tamil, etc.
+              📍 Location: {location ? `${location.area}, ${location.district}, ${location.state}` : 'Detecting...'}
             </p>
           </div>
         </Card>
