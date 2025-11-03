@@ -19,9 +19,19 @@ export default function Login() {
   const [fullName, setFullName] = useState('');
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
-        navigate('/dashboard');
+        // Check if user is admin
+        const { data: isAdminResult } = await supabase.rpc('is_admin', { 
+          check_user_id: session.user.id 
+        });
+        
+        // Navigate based on role
+        if (isAdminResult) {
+          navigate('/admin');
+        } else {
+          navigate('/dashboard');
+        }
       }
     });
   }, [navigate]);
@@ -60,15 +70,26 @@ export default function Login() {
     setLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       });
 
       if (error) throw error;
 
+      // Check if user is admin
+      const { data: isAdminResult } = await supabase.rpc('is_admin', { 
+        check_user_id: data.user.id 
+      });
+
       toast.success('Successfully signed in!');
-      navigate('/dashboard');
+      
+      // Navigate based on role
+      if (isAdminResult) {
+        navigate('/admin');
+      } else {
+        navigate('/dashboard');
+      }
     } catch (error: any) {
       toast.error(error.message || 'Failed to sign in');
     } finally {
