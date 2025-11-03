@@ -12,29 +12,19 @@ serve(async (req) => {
 
   try {
     const { messages, userLocation, images } = await req.json();
-    
-    console.log('Received request:', { 
-      messagesCount: messages?.length, 
-      hasLocation: !!userLocation,
-      imagesCount: images?.length 
-    });
-    
     const LOVABLE_API_KEY = Deno.env.get('LOVABLE_API_KEY');
     
     if (!LOVABLE_API_KEY) {
-      console.error('LOVABLE_API_KEY is not configured');
       throw new Error('LOVABLE_API_KEY is not configured');
     }
 
-    const locationInfo = userLocation && userLocation.area
+    const locationInfo = userLocation 
       ? `Current detected location: ${userLocation.area}, ${userLocation.district}, ${userLocation.state} (Lat: ${userLocation.latitude}, Lon: ${userLocation.longitude})`
       : 'Location not yet detected';
     
-    const imageInfo = images && Array.isArray(images) && images.length > 0
+    const imageInfo = images && images.length > 0
       ? `User has uploaded ${images.length} image(s) for this issue. Images are available at: ${images.join(', ')}`
       : 'No images uploaded yet';
-    
-    console.log('Session data:', { locationInfo, imageInfo });
 
     const systemPrompt = `You are an AI Civic Guide built into a smart city web application called Urban Issue Reporting & Resolution App.
 Your purpose is to help users report public issues step-by-step in a simple, friendly, and human-like conversation.
@@ -110,9 +100,6 @@ Important Instructions:
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('AI gateway error:', response.status, errorText);
-      
       if (response.status === 429) {
         return new Response(JSON.stringify({ error: 'Rate limits exceeded, please try again later.' }), {
           status: 429,
@@ -125,20 +112,15 @@ Important Instructions:
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
-      return new Response(JSON.stringify({ error: 'AI gateway error', details: errorText }), {
+      const errorText = await response.text();
+      console.error('AI gateway error:', response.status, errorText);
+      return new Response(JSON.stringify({ error: 'AI gateway error' }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
     const data = await response.json();
-    console.log('AI response received:', { hasChoices: !!data.choices, choicesLength: data.choices?.length });
-    
-    if (!data.choices || !data.choices[0] || !data.choices[0].message) {
-      console.error('Invalid AI response structure:', data);
-      throw new Error('Invalid response from AI');
-    }
-    
     const assistantMessage = data.choices[0].message.content;
 
     return new Response(JSON.stringify({ message: assistantMessage }), {
