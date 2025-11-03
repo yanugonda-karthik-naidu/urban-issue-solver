@@ -64,7 +64,13 @@ CREATE POLICY "Users can update their own issues"
 CREATE TABLE public.admins (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL UNIQUE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  email TEXT NOT NULL,
+  full_name TEXT,
+  role TEXT DEFAULT 'admin' CHECK (role IN ('admin', 'super_admin', 'city_admin')),
+  district TEXT,
+  state TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  last_login TIMESTAMPTZ
 );
 
 -- Enable RLS on admins
