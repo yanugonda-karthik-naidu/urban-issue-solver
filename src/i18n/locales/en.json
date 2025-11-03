@@ -1,0 +1,82 @@
+{
+  "nav": {
+    "home": "Home",
+    "report": "Report Issue",
+    "dashboard": "Dashboard",
+    "login": "Login",
+    "logout": "Logout",
+    "admin": "Admin"
+  },
+  "hero": {
+    "title": "Report. Track. Resolve.",
+    "subtitle": "Your voice matters in building a better community. Report civic issues instantly with AI assistance.",
+    "cta": "Get Started",
+    "learnMore": "Learn More"
+  },
+  "features": {
+    "title": "Why Choose Our Platform?",
+    "ai": {
+      "title": "AI-Powered Assistance",
+      "description": "Get step-by-step guidance from our intelligent assistant"
+    },
+    "realtime": {
+      "title": "Real-Time Tracking",
+      "description": "Monitor your issue status with live updates"
+    },
+    "multilingual": {
+      "title": "Multilingual Support",
+      "description": "Report in your preferred language"
+    },
+    "location": {
+      "title": "Auto-Location",
+      "description": "Automatically detect and verify your location"
+    }
+  },
+  "auth": {
+    "signInWithGoogle": "Sign in with Google",
+    "welcome": "Welcome back!",
+    "getStarted": "Get started with CivicReport"
+  },
+  "dashboard": {
+    "title": "My Reports",
+    "stats": {
+      "total": "Total Reports",
+      "pending": "Pending",
+      "inProgress": "In Progress",
+      "resolved": "Resolved"
+    },
+    "noReports": "No reports yet. Report your first issue!",
+    "reportIssue": "Report New Issue"
+  },
+  "report": {
+    "title": "Report an Issue",
+    "category": "Category",
+    "categories": {
+      "roads": "Roads & Transportation",
+      "garbage": "Garbage & Sanitation",
+      "water": "Water Supply",
+      "electricity": "Electricity",
+      "other": "Other"
+    },
+    "issueTitle": "Issue Title",
+    "description": "Description",
+    "uploadPhoto": "Upload Photo",
+    "location": "Location",
+    "submit": "Submit Report",
+    "submitting": "Submitting..."
+  },
+  "status": {
+    "pending": "Pending",
+    "inProgress": "In Progress",
+    "resolved": "Resolved"
+  },
+  "common": {
+    "loading": "Loading...",
+    "error": "Something went wrong",
+    "success": "Success!",
+    "cancel": "Cancel",
+    "save": "Save",
+    "delete": "Delete",
+    "edit": "Edit"
+  }
+}
