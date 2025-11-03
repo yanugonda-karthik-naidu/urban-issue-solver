@@ -20,6 +20,7 @@ interface Issue {
   title: string;
   category: string;
   status: 'pending' | 'in_progress' | 'resolved';
+  priority?: 'high' | 'medium' | 'low';
   created_at: string;
   area: string | null;
   district: string | null;
@@ -115,6 +116,17 @@ export default function Dashboard() {
     resolved: issues.filter(i => i.status === 'resolved').length,
   };
 
+  // Helper to determine an issue's priority for demo purposes when not present in DB
+  const getIssuePriority = (issue: Issue, idx: number) => {
+    if ((issue as any).priority) return (issue as any).priority as 'high' | 'medium' | 'low';
+    // deterministic demo assignment: cycle through high, medium, low
+    const map = ['high', 'medium', 'low'] as const;
+    return map[idx % 3];
+  };
+
+  const [priorityFilter, setPriorityFilter] = useState<'all' | 'high' | 'medium' | 'low'>('all');
+  // displayedIssues removed — rendering all issues
+
   return (
     <div className="min-h-screen bg-surface-50">
       <div className="container py-8">
@@ -171,6 +183,20 @@ export default function Dashboard() {
           </Card>
         </div>
 
+        {/* Priority filter */}
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="text-lg font-semibold">Priority</h2>
+          <div className="flex items-center gap-2">
+            <label className="text-sm text-muted-foreground">Filter:</label>
+            <select value={priorityFilter} onChange={(e) => setPriorityFilter(e.target.value as any)} className="rounded-md border bg-background px-2 py-1 text-sm">
+              <option value="all">All</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
+        </div>
+
         {/* Issues List */}
         {loading ? (
           <div className="text-center py-12">
@@ -187,7 +213,7 @@ export default function Dashboard() {
           </Card>
         ) : (
           <div className="grid gap-4">
-            {issues.map((issue) => (
+            {issues.map((issue, idx) => (
               <Card key={issue.id} className="shadow-md hover:shadow-lg transition-all overflow-hidden">
                 <CardContent className="p-0">
                   <div className="flex flex-col md:flex-row items-stretch md:items-center">
@@ -209,6 +235,15 @@ export default function Dashboard() {
                           <div className="mt-2 flex items-center gap-2">
                             <Badge variant="outline" className="text-sm">{issue.category}</Badge>
                             <span className="text-xs text-muted-foreground">{issue.area && issue.district && issue.state ? `${issue.area}, ${issue.district}` : t('dashboard.locationNotSpecified') || 'Location not specified'}</span>
+                          </div>
+                          <div className="mt-2">
+                            {/* demo priority badge */}
+                            {(() => {
+                              const p = getIssuePriority(issue, idx);
+                              if (p === 'high') return <Badge className="bg-destructive/10 text-destructive border-destructive/20">High</Badge>;
+                              if (p === 'medium') return <Badge className="bg-warning/10 text-warning border-warning/20">Medium</Badge>;
+                              return <Badge className="bg-success/10 text-success border-success/20">Low</Badge>;
+                            })()}
                           </div>
                         </div>
 
