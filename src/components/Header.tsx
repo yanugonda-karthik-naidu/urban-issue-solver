@@ -5,6 +5,7 @@ import { Menu, X, Globe, LogOut } from 'lucide-react';
 import { Button } from './ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import UserNotificationBell from './UserNotificationBell';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -68,6 +69,8 @@ export const Header = () => {
               </Link>
             </>
           )}
+
+          {user && <UserNotificationBell />}
           
           <DropdownMenu>
             <DropdownMenuTrigger asChild>

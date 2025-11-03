@@ -59,7 +59,7 @@ export default function ReportIssue() {
     setLoading(true);
 
     try {
-      const { error } = await supabase.from('issues').insert({
+      const { data: newIssue, error } = await supabase.from('issues').insert({
         user_id: userId,
         title: formData.title,
         description: formData.description,
@@ -71,9 +71,26 @@ export default function ReportIssue() {
         longitude: formData.longitude,
         photo_url: uploadedImages[0] || null,
         status: 'pending',
-      });
+      }).select().single();
 
       if (error) throw error;
+
+      // Notify all admins about new issue
+      const { data: admins } = await supabase
+        .from('admins')
+        .select('user_id');
+
+      if (admins && admins.length > 0) {
+        const notifications = admins.map(admin => ({
+          user_id: admin.user_id,
+          title: 'New Issue Reported',
+          message: `${formData.title} - ${formData.category}`,
+          type: 'new_issue',
+          issue_id: newIssue.id,
+        }));
+
+        await supabase.from('notifications').insert(notifications);
+      }
 
       toast.success('Issue reported successfully!');
       navigate('/dashboard');

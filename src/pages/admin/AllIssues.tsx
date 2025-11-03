@@ -142,7 +142,7 @@ export default function AllIssues() {
     };
   }, [isAdmin]);
 
-  const updateStatus = async (issueId: string, newStatus: string) => {
+  const updateStatus = async (issueId: string, newStatus: string, userId: string) => {
     try {
       const { error } = await supabase
         .from('issues')
@@ -150,6 +150,22 @@ export default function AllIssues() {
         .eq('id', issueId);
 
       if (error) throw error;
+
+      // Create notification for the user who reported the issue
+      const statusMessages = {
+        pending: 'Your issue is pending review',
+        in_progress: 'Your issue is now being worked on',
+        resolved: 'Your issue has been resolved',
+      };
+
+      await supabase.from('notifications').insert({
+        user_id: userId,
+        title: 'Issue Status Updated',
+        message: statusMessages[newStatus as keyof typeof statusMessages] || 'Your issue status has been updated',
+        type: 'status_update',
+        issue_id: issueId,
+      });
+
       toast.success('Status updated successfully!');
       fetchIssues();
     } catch (error) {
@@ -397,7 +413,7 @@ export default function AllIssues() {
                             <Button 
                               variant="outline" 
                               size="sm"
-                              onClick={() => updateStatus(issue.id, 'pending')}
+                              onClick={() => updateStatus(issue.id, 'pending', issue.user_id)}
                               disabled={issue.status === 'pending'}
                               className="bg-warning/10 hover:bg-warning/20 text-warning border-warning/20"
                             >
@@ -406,7 +422,7 @@ export default function AllIssues() {
                             <Button 
                               variant="outline"
                               size="sm"
-                              onClick={() => updateStatus(issue.id, 'in_progress')}
+                              onClick={() => updateStatus(issue.id, 'in_progress', issue.user_id)}
                               disabled={issue.status === 'in_progress'}
                               className="bg-primary/10 hover:bg-primary/20 text-primary border-primary/20"
                             >
@@ -415,7 +431,7 @@ export default function AllIssues() {
                             <Button 
                               variant="outline"
                               size="sm"
-                              onClick={() => updateStatus(issue.id, 'resolved')}
+                              onClick={() => updateStatus(issue.id, 'resolved', issue.user_id)}
                               disabled={issue.status === 'resolved'}
                               className="bg-success/10 hover:bg-success/20 text-success border-success/20"
                             >

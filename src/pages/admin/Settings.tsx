@@ -125,7 +125,7 @@ export default function Settings() {
             </div>
           ) : (
             <div className="max-w-2xl space-y-6">
-              <h1 className="text-3xl font-bold">Settings</h1>
+              <h1 className="text-3xl font-bold">Profile Settings</h1>
 
               <Card className="shadow-soft">
                 <CardHeader>
