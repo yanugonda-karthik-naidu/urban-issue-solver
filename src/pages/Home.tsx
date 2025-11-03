@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Brain, MapPin, Languages, Clock } from 'lucide-react';
 import heroImage from '@/assets/hero-civic.jpg';
+import { FloatingChatbot } from '@/components/FloatingChatbot';
 
 export default function Home() {
   const { t } = useTranslation();
@@ -33,6 +34,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen">
+      <FloatingChatbot />
       {/* Hero Section */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-hero opacity-90" />

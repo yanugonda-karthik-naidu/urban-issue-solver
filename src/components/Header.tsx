@@ -63,6 +63,9 @@ export const Header = () => {
               <Link to="/dashboard" className="text-sm font-medium hover:text-primary transition-colors">
                 {t('nav.dashboard')}
               </Link>
+              <Link to="/profile" className="text-sm font-medium hover:text-primary transition-colors">
+                Profile
+              </Link>
               <Link to="/admin" className="text-sm font-medium hover:text-primary transition-colors">
                 {t('nav.admin')}
               </Link>
@@ -120,6 +123,9 @@ export const Header = () => {
                 </Link>
                 <Link to="/dashboard" className="text-sm font-medium hover:text-primary transition-colors">
                   {t('nav.dashboard')}
+                </Link>
+                <Link to="/profile" className="text-sm font-medium hover:text-primary transition-colors">
+                  Profile
                 </Link>
                 <Link to="/admin" className="text-sm font-medium hover:text-primary transition-colors">
                   {t('nav.admin')}
