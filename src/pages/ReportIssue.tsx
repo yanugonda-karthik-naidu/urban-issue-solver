@@ -9,7 +9,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { MapPin, Upload } from 'lucide-react';
+import { MapPin, Upload, X } from 'lucide-react';
+import { uploadToCloudinary } from '@/lib/cloudinary';
+import { useRef } from 'react';
 
 export default function ReportIssue() {
   const { t } = useTranslation();
@@ -26,6 +28,9 @@ export default function ReportIssue() {
     latitude: null as number | null,
     longitude: null as number | null,
   });
+  const [uploadedImages, setUploadedImages] = useState<string[]>([]);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -64,6 +69,7 @@ export default function ReportIssue() {
         state: formData.state || null,
         latitude: formData.latitude,
         longitude: formData.longitude,
+        photo_url: uploadedImages[0] || null,
         status: 'pending',
       });
 
@@ -97,6 +103,35 @@ export default function ReportIssue() {
     } else {
       toast.error('Geolocation not supported');
     }
+  };
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploading(true);
+    try {
+      const uploadPromises = Array.from(files).map(file => uploadToCloudinary(file));
+      const results = await Promise.all(uploadPromises);
+      // Log detailed upload info and extract secure_url for display/storage
+      const urls: string[] = results.map((res: any, i: number) => {
+        // eslint-disable-next-line no-console
+        console.info('Cloudinary upload result', { index: i, public_id: res.public_id, secure_url: res.secure_url, bytes: res.bytes, format: res.format });
+        return res.secure_url as string;
+      });
+      setUploadedImages(prev => [...prev, ...urls]);
+      toast.success(`${urls.length} image(s) uploaded`);
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast.error(error.message || 'Failed to upload images');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setUploadedImages(prev => prev.filter((_, i) => i !== index));
   };
 
   return (
@@ -195,15 +230,42 @@ export default function ReportIssue() {
 
               <div>
                 <Label htmlFor="photo">{t('report.uploadPhoto')}</Label>
-                <div className="mt-2 flex items-center gap-2">
-                  <Button type="button" variant="outline" className="w-full">
-                    <Upload className="mr-2 h-4 w-4" />
-                    {t('report.uploadPhoto')}
-                  </Button>
+                <div className="mt-2">
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handleImageUpload}
+                    className="hidden"
+                  />
+
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="w-full"
+                      onClick={() => fileInputRef?.current?.click()}
+                      disabled={uploading}
+                    >
+                      <Upload className="mr-2 h-4 w-4" />
+                      {uploading ? 'Uploading...' : t('report.uploadPhoto')}
+                    </Button>
+                  </div>
+
+                  {uploadedImages.length > 0 && (
+                    <div className="mt-3 flex gap-2 flex-wrap">
+                      {uploadedImages.map((url, index) => (
+                        <div key={index} className="relative group">
+                          <img src={url} alt={`Upload ${index + 1}`} className="h-20 w-20 object-cover rounded-lg border" />
+                          <button type="button" onClick={() => removeImage(index)} className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                            <X className="h-3 w-3" />
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Photo upload coming soon
-                </p>
               </div>
 
               <Button type="submit" variant="hero" className="w-full" disabled={loading}>

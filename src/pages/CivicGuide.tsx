@@ -103,8 +103,13 @@ export default function CivicGuide() {
     setUploading(true);
     try {
       const uploadPromises = Array.from(files).map(file => uploadToCloudinary(file));
-      const urls = await Promise.all(uploadPromises);
-      
+      const results = await Promise.all(uploadPromises);
+      const urls: string[] = results.map((res: any, i: number) => {
+        // eslint-disable-next-line no-console
+        console.info('Cloudinary upload result', { index: i, public_id: res.public_id, secure_url: res.secure_url, bytes: res.bytes, format: res.format });
+        return res.secure_url as string;
+      });
+
       setUploadedImages(prev => [...prev, ...urls]);
       toast.success(`✅ ${urls.length} image(s) uploaded successfully!`);
     } catch (error: any) {
