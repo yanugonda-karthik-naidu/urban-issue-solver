@@ -14,13 +14,126 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      admins: {
+        Row: {
+          created_at: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      issues: {
+        Row: {
+          admin_remarks: string | null
+          area: string | null
+          category: string
+          created_at: string | null
+          description: string
+          district: string | null
+          id: string
+          latitude: number | null
+          longitude: number | null
+          photo_url: string | null
+          state: string | null
+          status: string | null
+          title: string
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          admin_remarks?: string | null
+          area?: string | null
+          category: string
+          created_at?: string | null
+          description: string
+          district?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          photo_url?: string | null
+          state?: string | null
+          status?: string | null
+          title: string
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          admin_remarks?: string | null
+          area?: string | null
+          category?: string
+          created_at?: string | null
+          description?: string
+          district?: string | null
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          photo_url?: string | null
+          state?: string | null
+          status?: string | null
+          title?: string
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          address: string | null
+          area: string | null
+          avatar_url: string | null
+          created_at: string | null
+          district: string | null
+          email: string | null
+          full_name: string | null
+          id: string
+          phone: string | null
+          state: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          address?: string | null
+          area?: string | null
+          avatar_url?: string | null
+          created_at?: string | null
+          district?: string | null
+          email?: string | null
+          full_name?: string | null
+          id: string
+          phone?: string | null
+          state?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          address?: string | null
+          area?: string | null
+          avatar_url?: string | null
+          created_at?: string | null
+          district?: string | null
+          email?: string | null
+          full_name?: string | null
+          id?: string
+          phone?: string | null
+          state?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_admin: { Args: { check_user_id: string }; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
