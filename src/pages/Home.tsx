@@ -61,6 +61,16 @@ export default function Home() {
                     </Button>
                   </Link>
                 </div>
+                {/* Quick location box */}
+                <div className="mt-6">
+                  <div className="inline-flex items-center gap-3 rounded-lg bg-white/90 p-3 shadow-sm">
+                    <MapPin className="h-5 w-5 text-primary" />
+                    <div className="leading-tight">
+                      <div className="text-sm font-medium text-slate-900">{t('features.location.title')}</div>
+                      <div className="text-xs text-muted-foreground">{t('features.location.description')}</div>
+                    </div>
+                  </div>
+                </div>
               </div>
               {/* Stats */}
               <div className="mt-10 grid grid-cols-3 gap-4">
@@ -80,8 +90,20 @@ export default function Home() {
             </div>
 
             <div className="md:col-span-5 lg:col-span-6">
-              <div className="rounded-2xl overflow-hidden shadow-2xl">
+              <div className="rounded-2xl overflow-hidden shadow-2xl relative">
                 <img src={heroImage} alt="Civic hero" className="w-full h-72 md:h-[420px] object-cover" />
+                <div className="absolute top-6 left-6 bg-white/90 backdrop-blur rounded-lg p-3 shadow-md">
+                  <div className="flex items-center gap-3">
+                    <MapPin className="h-5 w-5 text-primary" />
+                    <div className="text-sm">
+                      <div className="font-semibold">{t('features.location.title')}</div>
+                      <div className="text-xs text-muted-foreground">{t('features.location.description')}</div>
+                    </div>
+                  </div>
+                </div>
+                <div className="absolute right-6 bottom-6 bg-white/90 backdrop-blur rounded-lg p-3 shadow-md">
+                  <div className="text-sm font-medium">Quick Report</div>
+                </div>
               </div>
             </div>
           </div>
