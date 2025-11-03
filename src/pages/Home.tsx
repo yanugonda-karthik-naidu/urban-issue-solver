@@ -5,35 +5,28 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Brain, MapPin, Languages, Clock } from 'lucide-react';
 import heroImage from '@/assets/hero-civic.jpg';
 import { FloatingChatbot } from '@/components/FloatingChatbot';
-
 export default function Home() {
-  const { t } = useTranslation();
-
-  const features = [
-    {
-      icon: Brain,
-      title: t('features.ai.title'),
-      description: t('features.ai.description'),
-    },
-    {
-      icon: Clock,
-      title: t('features.realtime.title'),
-      description: t('features.realtime.description'),
-    },
-    {
-      icon: Languages,
-      title: t('features.multilingual.title'),
-      description: t('features.multilingual.description'),
-    },
-    {
-      icon: MapPin,
-      title: t('features.location.title'),
-      description: t('features.location.description'),
-    },
-  ];
-
-  return (
-    <div className="min-h-screen bg-surface-50">
+  const {
+    t
+  } = useTranslation();
+  const features = [{
+    icon: Brain,
+    title: t('features.ai.title'),
+    description: t('features.ai.description')
+  }, {
+    icon: Clock,
+    title: t('features.realtime.title'),
+    description: t('features.realtime.description')
+  }, {
+    icon: Languages,
+    title: t('features.multilingual.title'),
+    description: t('features.multilingual.description')
+  }, {
+    icon: MapPin,
+    title: t('features.location.title'),
+    description: t('features.location.description')
+  }];
+  return <div className="min-h-screen bg-surface-50">
       <FloatingChatbot />
 
       {/* Hero Section - split layout */}
@@ -101,9 +94,7 @@ export default function Home() {
                     </div>
                   </div>
                 </div>
-                <div className="absolute right-6 bottom-6 bg-white/90 backdrop-blur rounded-lg p-3 shadow-md">
-                  <div className="text-sm font-medium">Quick Report</div>
-                </div>
+                
               </div>
             </div>
           </div>
@@ -121,8 +112,7 @@ export default function Home() {
           </div>
 
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
-            {features.map((feature, index) => (
-              <Card key={index} className="border-0 hover:scale-105 transition-transform duration-300">
+            {features.map((feature, index) => <Card key={index} className="border-0 hover:scale-105 transition-transform duration-300">
                 <CardContent className="pt-6">
                   <div className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-sky-400 text-white shadow-lg">
                     <feature.icon className="h-7 w-7" />
@@ -130,8 +120,7 @@ export default function Home() {
                   <h3 className="text-lg font-semibold mb-2">{feature.title}</h3>
                   <p className="text-sm text-muted-foreground">{feature.description}</p>
                 </CardContent>
-              </Card>
-            ))}
+              </Card>)}
           </div>
         </div>
       </section>
@@ -154,6 +143,5 @@ export default function Home() {
           </Card>
         </div>
       </section>
-    </div>
-  );
+    </div>;
 }
