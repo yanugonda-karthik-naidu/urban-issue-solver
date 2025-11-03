@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
-import { Mail, Lock, User } from 'lucide-react';
+import { Mail, Lock, User, Shield } from 'lucide-react';
 
 export default function Login() {
   const { t } = useTranslation();
@@ -17,6 +17,7 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [fullName, setFullName] = useState('');
+  const [isAdminLogin, setIsAdminLogin] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
@@ -77,18 +78,35 @@ export default function Login() {
 
       if (error) throw error;
 
-      // Check if user is admin
-      const { data: isAdminResult } = await supabase.rpc('is_admin', { 
-        check_user_id: data.user.id 
-      });
+      if (isAdminLogin) {
+        // Check if user is admin for admin login mode
+        const { data: isAdminResult, error: adminError } = await supabase.rpc('is_admin', { 
+          check_user_id: data.user.id 
+        });
 
-      toast.success('Successfully signed in!');
-      
-      // Navigate based on role
-      if (isAdminResult) {
-        navigate('/admin');
+        if (adminError) throw adminError;
+
+        if (isAdminResult) {
+          toast.success('Admin login successful!');
+          navigate('/admin');
+        } else {
+          toast.error('Access denied. Admin privileges required.');
+          await supabase.auth.signOut();
+        }
       } else {
-        navigate('/dashboard');
+        // Regular user login
+        const { data: isAdminResult } = await supabase.rpc('is_admin', { 
+          check_user_id: data.user.id 
+        });
+
+        toast.success('Successfully signed in!');
+        
+        // Navigate based on role
+        if (isAdminResult) {
+          navigate('/admin');
+        } else {
+          navigate('/dashboard');
+        }
       }
     } catch (error: any) {
       toast.error(error.message || 'Failed to sign in');
@@ -108,10 +126,34 @@ export default function Login() {
           <CardDescription>{t('auth.getStarted')}</CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Admin Login Toggle */}
+          <div className="mb-6 p-4 bg-muted/50 rounded-lg border border-border">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Shield className="h-5 w-5 text-primary" />
+                <span className="font-medium">Admin Mode</span>
+              </div>
+              <Button
+                variant={isAdminLogin ? "default" : "outline"}
+                size="sm"
+                onClick={() => setIsAdminLogin(!isAdminLogin)}
+              >
+                {isAdminLogin ? 'Enabled' : 'Disabled'}
+              </Button>
+            </div>
+            {isAdminLogin && (
+              <p className="mt-2 text-sm text-muted-foreground">
+                Admin login mode is enabled. Only authorized administrators can access.
+              </p>
+            )}
+          </div>
+
           <Tabs defaultValue="signin" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="signin">Sign In</TabsTrigger>
-              <TabsTrigger value="signup">Sign Up</TabsTrigger>
+              <TabsTrigger value="signup" disabled={isAdminLogin}>
+                {isAdminLogin ? 'Disabled' : 'Sign Up'}
+              </TabsTrigger>
             </TabsList>
             
             <TabsContent value="signin">

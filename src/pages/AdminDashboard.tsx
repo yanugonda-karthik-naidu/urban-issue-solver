@@ -68,23 +68,31 @@ export default function AdminDashboard() {
   }, [navigate]);
 
   const fetchIssues = async () => {
-    const { data, error } = await supabase
-      .from('issues')
-      .select(`
-        *,
-        profiles:user_id (
-          full_name,
-          email
-        )
-      `)
-      .order('created_at', { ascending: false });
+    try {
+      const { data, error } = await supabase
+        .from('issues')
+        .select(`
+          *,
+          profiles:user_id (
+            full_name,
+            email
+          )
+        `)
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      toast.error('Failed to load issues');
-    } else {
-      setIssues((data as any[]) || []);
+      if (error) {
+        console.error('Error fetching issues:', error);
+        toast.error('Failed to load issues: ' + error.message);
+      } else {
+        console.log('Fetched issues:', data);
+        setIssues((data as any[]) || []);
+      }
+    } catch (err) {
+      console.error('Unexpected error:', err);
+      toast.error('An unexpected error occurred');
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   useEffect(() => {

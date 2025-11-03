@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Link, useNavigate } from 'react-router-dom';
-import { Menu, X, Globe, LogOut, Shield } from 'lucide-react';
+import { Menu, X, Globe, LogOut } from 'lucide-react';
 import { Button } from './ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -11,25 +11,12 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-} from './ui/dialog';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
 
 export const Header = () => {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
-  const [adminDialogOpen, setAdminDialogOpen] = useState(false);
-  const [adminEmail, setAdminEmail] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
-  const [adminLoading, setAdminLoading] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -51,40 +38,6 @@ export const Header = () => {
     await supabase.auth.signOut();
     toast.success('Logged out successfully');
     navigate('/');
-  };
-
-  const handleAdminLogin = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setAdminLoading(true);
-
-    try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: adminEmail,
-        password: adminPassword,
-      });
-
-      if (error) throw error;
-
-      // Check if user is admin
-      const { data: isAdminData } = await supabase.rpc('is_admin', {
-        check_user_id: data.user.id,
-      });
-
-      if (isAdminData) {
-        toast.success('Admin login successful!');
-        setAdminDialogOpen(false);
-        setAdminEmail('');
-        setAdminPassword('');
-        navigate('/admin');
-      } else {
-        toast.error('Access denied. Admin privileges required.');
-        await supabase.auth.signOut();
-      }
-    } catch (error: any) {
-      toast.error(error.message || 'Failed to login');
-    } finally {
-      setAdminLoading(false);
-    }
   };
 
   return (
@@ -132,11 +85,6 @@ export const Header = () => {
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button variant="ghost" size="sm" onClick={() => setAdminDialogOpen(true)}>
-            <Shield className="h-4 w-4 mr-2" />
-            Admin
-          </Button>
-
           {user ? (
             <Button variant="outline" onClick={handleLogout}>
               <LogOut className="mr-2 h-4 w-4" />
@@ -175,13 +123,9 @@ export const Header = () => {
                 </Link>
                 <Link to="/profile" className="text-sm font-medium hover:text-primary transition-colors">
                   Profile
-                </Link>
-              </>
+              </Link>
+            </>
             )}
-            <Button variant="ghost" size="sm" onClick={() => setAdminDialogOpen(true)} className="w-full justify-start">
-              <Shield className="h-4 w-4 mr-2" />
-              Admin Login
-            </Button>
             {user ? (
               <Button variant="outline" onClick={handleLogout} className="w-full">
                 <LogOut className="mr-2 h-4 w-4" />
@@ -195,45 +139,6 @@ export const Header = () => {
           </div>
         </div>
       )}
-
-      {/* Admin Login Dialog */}
-      <Dialog open={adminDialogOpen} onOpenChange={setAdminDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Admin Login</DialogTitle>
-            <DialogDescription>
-              Enter your admin credentials to access the admin dashboard.
-            </DialogDescription>
-          </DialogHeader>
-          <form onSubmit={handleAdminLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="admin-email">Email</Label>
-              <Input
-                id="admin-email"
-                type="email"
-                placeholder="admin@example.com"
-                value={adminEmail}
-                onChange={(e) => setAdminEmail(e.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="admin-password">Password</Label>
-              <Input
-                id="admin-password"
-                type="password"
-                placeholder="••••••••"
-                value={adminPassword}
-                onChange={(e) => setAdminPassword(e.target.value)}
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={adminLoading}>
-              {adminLoading ? 'Signing in...' : 'Sign In as Admin'}
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
     </header>
   );
 };
