@@ -18,6 +18,7 @@ import { toast } from 'sonner';
 interface Issue {
   id: string;
   title: string;
+  description: string;
   category: string;
   status: 'pending' | 'in_progress' | 'resolved';
   priority?: 'high' | 'medium' | 'low';
@@ -26,6 +27,7 @@ interface Issue {
   district: string | null;
   state: string | null;
   photo_url: string | null;
+  admin_remarks: string | null;
 }
 
 export default function Dashboard() {
@@ -285,9 +287,25 @@ export default function Dashboard() {
               </DialogDescription>
             </DialogHeader>
 
-            {selectedIssue?.photo_url && (
-              <div className="mt-4">
-                <img src={selectedIssue.photo_url} alt={selectedIssue.title} className="w-full max-h-80 object-cover rounded-md" />
+            {selectedIssue && (
+              <div className="mt-4 space-y-4">
+                <div>
+                  <p className="text-sm font-medium mb-1">Description</p>
+                  <p className="text-sm text-muted-foreground">{selectedIssue.description}</p>
+                </div>
+                
+                {selectedIssue.photo_url && (
+                  <div>
+                    <img src={selectedIssue.photo_url} alt={selectedIssue.title} className="w-full max-h-80 object-cover rounded-md" />
+                  </div>
+                )}
+
+                {selectedIssue.admin_remarks && (
+                  <div className="p-4 bg-primary/5 rounded-lg border border-primary/10">
+                    <p className="text-sm font-medium mb-2">Admin Update</p>
+                    <p className="text-sm text-muted-foreground">{selectedIssue.admin_remarks}</p>
+                  </div>
+                )}
               </div>
             )}
 
