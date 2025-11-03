@@ -49,14 +49,14 @@ export default function Home() {
               {t('hero.subtitle')}
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center animate-in fade-in slide-in-from-bottom-4 duration-1000 delay-300">
-              <Link to="/login">
+              <Link to="/civic-guide">
                 <Button variant="hero" size="lg" className="text-lg">
-                  {t('hero.cta')}
+                  🤖 Try AI Civic Guide
                 </Button>
               </Link>
-              <Link to="#features">
+              <Link to="/login">
                 <Button variant="outline" size="lg" className="text-lg bg-background/10 backdrop-blur border-primary-foreground/20 text-primary-foreground hover:bg-background/20">
-                  {t('hero.learnMore')}
+                  {t('hero.cta')}
                 </Button>
               </Link>
             </div>
