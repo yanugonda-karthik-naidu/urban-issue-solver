@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { toast } from 'sonner';
 import { MapPin, Upload, X } from 'lucide-react';
 import { uploadToCloudinary } from '@/lib/cloudinary';
-import { useRef } from 'react';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
 export default function ReportIssue() {
   const { t } = useTranslation();
@@ -84,6 +84,29 @@ export default function ReportIssue() {
     }
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setUploading(true);
+    try {
+      const uploadPromises = Array.from(files).map(file => uploadToCloudinary(file));
+      const urls = await Promise.all(uploadPromises);
+      setUploadedImages(prev => [...prev, ...urls]);
+      toast.success(`${urls.length} image(s) uploaded`);
+    } catch (error: any) {
+      console.error('Upload error:', error);
+      toast.error(error.message || 'Failed to upload images');
+    } finally {
+      setUploading(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const removeImage = (index: number) => {
+    setUploadedImages(prev => prev.filter((_, i) => i !== index));
+  };
+
   const getLocation = () => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
@@ -103,35 +126,6 @@ export default function ReportIssue() {
     } else {
       toast.error('Geolocation not supported');
     }
-  };
-
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = e.target.files;
-    if (!files || files.length === 0) return;
-
-    setUploading(true);
-    try {
-      const uploadPromises = Array.from(files).map(file => uploadToCloudinary(file));
-      const results = await Promise.all(uploadPromises);
-      // Log detailed upload info and extract secure_url for display/storage
-      const urls: string[] = results.map((res: any, i: number) => {
-        // eslint-disable-next-line no-console
-        console.info('Cloudinary upload result', { index: i, public_id: res.public_id, secure_url: res.secure_url, bytes: res.bytes, format: res.format });
-        return res.secure_url as string;
-      });
-      setUploadedImages(prev => [...prev, ...urls]);
-      toast.success(`${urls.length} image(s) uploaded`);
-    } catch (error: any) {
-      console.error('Upload error:', error);
-      toast.error(error.message || 'Failed to upload images');
-    } finally {
-      setUploading(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
-  const removeImage = (index: number) => {
-    setUploadedImages(prev => prev.filter((_, i) => i !== index));
   };
 
   return (
@@ -239,15 +233,8 @@ export default function ReportIssue() {
                     onChange={handleImageUpload}
                     className="hidden"
                   />
-
                   <div className="flex items-center gap-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="w-full"
-                      onClick={() => fileInputRef?.current?.click()}
-                      disabled={uploading}
-                    >
+                    <Button type="button" variant="outline" className="w-full" onClick={() => fileInputRef?.current?.click()} disabled={uploading}>
                       <Upload className="mr-2 h-4 w-4" />
                       {uploading ? 'Uploading...' : t('report.uploadPhoto')}
                     </Button>

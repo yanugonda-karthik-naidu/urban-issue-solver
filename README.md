@@ -191,7 +191,7 @@ The platform is designed to integrate conversational AI for:
 
 ## 📄 License
 
-This project is built with [Lovable](https://lovable.dev) and is open for community contributions.
+This project is open for community contributions.
 
 ## 🎯 Hackathon Ready
 
@@ -209,4 +209,4 @@ For support, email support@civicreport.app or join our Discord community.
 
 ---
 
-Built with ❤️ using [Lovable](https://lovable.dev)
+Built with ❤️

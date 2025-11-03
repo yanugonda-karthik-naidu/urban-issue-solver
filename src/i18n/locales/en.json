@@ -39,6 +39,7 @@
   },
   "dashboard": {
     "title": "My Reports",
+    "subtitle": "Your reported issues and their statuses — track progress and view details.",
     "stats": {
       "total": "Total Reports",
       "pending": "Pending",

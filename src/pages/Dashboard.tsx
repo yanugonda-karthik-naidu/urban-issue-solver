@@ -5,6 +5,13 @@ import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 import { AlertCircle, CheckCircle2, Clock, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -26,6 +33,8 @@ export default function Dashboard() {
   const [issues, setIssues] = useState<Issue[]>([]);
   const [loading, setLoading] = useState(true);
   const [userId, setUserId] = useState<string | null>(null);
+  const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -107,56 +116,57 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-card">
+    <div className="min-h-screen bg-surface-50">
       <div className="container py-8">
-        <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">{t('dashboard.title')}</h1>
-          <Button variant="hero" onClick={() => navigate('/report')}>
-            <Plus className="mr-2 h-4 w-4" />
-            {t('dashboard.reportIssue')}
-          </Button>
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
+          <div>
+            <h1 className="text-3xl font-extrabold text-slate-900">{t('dashboard.title')}</h1>
+            <p className="text-sm text-muted-foreground mt-1">{t('dashboard.subtitle') || ''}</p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" onClick={() => navigate('/report')}>
+              <Plus className="mr-2 h-4 w-4" />
+              {t('dashboard.reportIssue')}
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
         <div className="grid gap-4 md:grid-cols-4 mb-8">
-          <Card className="shadow-soft">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                {t('dashboard.stats.total')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold">{stats.total}</div>
+          <Card className="shadow-md">
+            <CardContent className="flex flex-col items-center justify-center text-center p-6">
+              <div className="p-3 rounded-full bg-primary/10 text-primary mb-2">
+                <Plus className="h-5 w-5" />
+              </div>
+              <div className="text-sm uppercase tracking-wider text-muted-foreground">{t('dashboard.stats.total')}</div>
+              <div className="text-3xl font-extrabold mt-2">{stats.total}</div>
             </CardContent>
           </Card>
-          <Card className="shadow-soft">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-warning">
-                {t('dashboard.stats.pending')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-warning">{stats.pending}</div>
+          <Card className="shadow-md">
+            <CardContent className="flex flex-col items-center justify-center text-center p-6">
+              <div className="p-3 rounded-full bg-warning/10 text-warning mb-2">
+                <Clock className="h-5 w-5" />
+              </div>
+              <div className="text-sm uppercase tracking-wider text-muted-foreground">{t('dashboard.stats.pending')}</div>
+              <div className="text-3xl font-extrabold text-warning mt-2">{stats.pending}</div>
             </CardContent>
           </Card>
-          <Card className="shadow-soft">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-primary">
-                {t('dashboard.stats.inProgress')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-primary">{stats.inProgress}</div>
+          <Card className="shadow-md">
+            <CardContent className="flex flex-col items-center justify-center text-center p-6">
+              <div className="p-3 rounded-full bg-primary/10 text-primary mb-2">
+                <AlertCircle className="h-5 w-5" />
+              </div>
+              <div className="text-sm uppercase tracking-wider text-muted-foreground">{t('dashboard.stats.inProgress')}</div>
+              <div className="text-3xl font-extrabold text-primary mt-2">{stats.inProgress}</div>
             </CardContent>
           </Card>
-          <Card className="shadow-soft">
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-success">
-                {t('dashboard.stats.resolved')}
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-3xl font-bold text-success">{stats.resolved}</div>
+          <Card className="shadow-md">
+            <CardContent className="flex flex-col items-center justify-center text-center p-6">
+              <div className="p-3 rounded-full bg-success/10 text-success mb-2">
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
+              <div className="text-sm uppercase tracking-wider text-muted-foreground">{t('dashboard.stats.resolved')}</div>
+              <div className="text-3xl font-extrabold text-success mt-2">{stats.resolved}</div>
             </CardContent>
           </Card>
         </div>
@@ -167,7 +177,7 @@ export default function Dashboard() {
             <p className="text-muted-foreground">{t('common.loading')}</p>
           </div>
         ) : issues.length === 0 ? (
-          <Card className="shadow-medium">
+          <Card className="shadow-md">
             <CardContent className="py-12 text-center">
               <p className="text-muted-foreground mb-4">{t('dashboard.noReports')}</p>
               <Button variant="hero" onClick={() => navigate('/report')}>
@@ -178,30 +188,79 @@ export default function Dashboard() {
         ) : (
           <div className="grid gap-4">
             {issues.map((issue) => (
-              <Card key={issue.id} className="shadow-soft hover:shadow-medium transition-all">
-                <CardContent className="p-6">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="text-lg font-semibold">{issue.title}</h3>
-                    {getStatusBadge(issue.status)}
+              <Card key={issue.id} className="shadow-md hover:shadow-lg transition-all overflow-hidden">
+                <CardContent className="p-0">
+                  <div className="flex flex-col md:flex-row items-stretch md:items-center">
+                    {/* Image on the left */}
+                    <div className="w-full md:w-56 h-40 md:h-32 flex-shrink-0 overflow-hidden bg-muted/10 flex items-center justify-center">
+                      {issue.photo_url ? (
+                        <img src={issue.photo_url} alt={issue.title} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="flex items-center justify-center w-full h-full">
+                          <AlertCircle className="h-6 w-6 text-muted-foreground" />
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="flex-1 p-6">
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <h3 className="text-lg font-semibold text-slate-900">{issue.title}</h3>
+                          <div className="mt-2 flex items-center gap-2">
+                            <Badge variant="outline" className="text-sm">{issue.category}</Badge>
+                            <span className="text-xs text-muted-foreground">{issue.area && issue.district && issue.state ? `${issue.area}, ${issue.district}` : t('dashboard.locationNotSpecified') || 'Location not specified'}</span>
+                          </div>
+                        </div>
+
+                        <div className="ml-4 flex flex-col items-end gap-2">
+                          {getStatusBadge(issue.status)}
+                          <div>
+                            <Button size="sm" variant="ghost" onClick={() => { setSelectedIssue(issue); setDialogOpen(true); }}>
+                              View
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 text-xs text-muted-foreground">{new Date(issue.created_at).toLocaleString()}</div>
+                    </div>
                   </div>
-                  <p className="text-sm text-muted-foreground mb-2">{issue.category}</p>
-                  <p className="text-sm text-muted-foreground">
-                    {issue.area && issue.district && issue.state
-                      ? `${issue.area}, ${issue.district}, ${issue.state}`
-                      : 'Location not specified'}
-                  </p>
-                  {issue.photo_url && (
-                    <img 
-                      src={issue.photo_url} 
-                      alt={issue.title}
-                      className="mt-4 rounded-lg max-h-48 w-auto object-cover"
-                    />
-                  )}
                 </CardContent>
               </Card>
             ))}
           </div>
         )}
+
+        {/* Detail dialog */}
+        <Dialog open={dialogOpen} onOpenChange={(open) => { setDialogOpen(open); if (!open) setSelectedIssue(null); }}>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>{selectedIssue?.title}</DialogTitle>
+              <DialogDescription>
+                {selectedIssue && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <Badge variant="outline" className="text-sm">{selectedIssue.category}</Badge>
+                      {getStatusBadge(selectedIssue.status)}
+                    </div>
+                    <div className="text-xs text-muted-foreground">{selectedIssue.area && selectedIssue.district ? `${selectedIssue.area}, ${selectedIssue.district}, ${selectedIssue.state ?? ''}` : t('dashboard.locationNotSpecified') || 'Location not specified'}</div>
+                    <div className="text-xs text-muted-foreground">{new Date(selectedIssue.created_at).toLocaleString()}</div>
+                  </div>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+
+            {selectedIssue?.photo_url && (
+              <div className="mt-4">
+                <img src={selectedIssue.photo_url} alt={selectedIssue.title} className="w-full max-h-80 object-cover rounded-md" />
+              </div>
+            )}
+
+            <div className="mt-4 flex justify-end">
+              <Button onClick={() => setDialogOpen(false)}>Close</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
