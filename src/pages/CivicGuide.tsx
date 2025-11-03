@@ -13,6 +13,7 @@ type Message = {
   role: 'user' | 'assistant';
   content: string;
   imageUrl?: string;
+  imageUrls?: string[];
 };
 
 type LocationData = {
@@ -106,6 +107,16 @@ export default function CivicGuide() {
       const urls = await Promise.all(uploadPromises);
       
       setUploadedImages(prev => [...prev, ...urls]);
+      // Append a user message immediately with uploaded image links
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'user',
+          content: `📷 Uploaded ${urls.length} image(s): ${urls.join(', ')}`,
+          imageUrl: urls[0],
+          imageUrls: urls,
+        } as Message,
+      ]);
       toast.success(`✅ ${urls.length} image(s) uploaded successfully!`);
     } catch (error: any) {
       console.error('Upload error:', error);
@@ -260,11 +271,18 @@ export default function CivicGuide() {
                   }`}
                 >
                   {message.imageUrl && (
-                    <img 
-                      src={message.imageUrl} 
-                      alt="Uploaded" 
+                    <img
+                      src={message.imageUrl}
+                      alt="Uploaded"
                       className="rounded-lg mb-2 max-w-full h-auto max-h-48 object-cover"
                     />
+                  )}
+                  {message.imageUrls && message.imageUrls.length > 1 && (
+                    <div className="flex gap-2 flex-wrap mt-2">
+                      {message.imageUrls.map((url, i) => (
+                        <img key={i} src={url} alt={`Uploaded ${i + 1}`} className="h-20 w-20 object-cover rounded-lg border" />
+                      ))}
+                    </div>
                   )}
                   <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                 </div>
