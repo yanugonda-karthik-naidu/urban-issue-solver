@@ -11,6 +11,10 @@ import ReportIssue from "./pages/ReportIssue";
 import CivicGuide from "./pages/CivicGuide";
 import Profile from "./pages/Profile";
 import AdminDashboard from "./pages/AdminDashboard";
+import AllIssues from "./pages/admin/AllIssues";
+import Analytics from "./pages/admin/Analytics";
+import Settings from "./pages/admin/Settings";
+import ManageAdmins from "./pages/admin/ManageAdmins";
 import NotFound from "./pages/NotFound";
 import "./i18n/config";
 
@@ -22,16 +26,25 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Header />
         <Routes>
-          <Route path="/" element={<Home />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/report" element={<ReportIssue />} />
-          <Route path="/civic-guide" element={<CivicGuide />} />
-          <Route path="/profile" element={<Profile />} />
+          {/* Public Routes */}
+          <Route path="/" element={<><Header /><Home /></>} />
+          <Route path="/login" element={<><Header /><Login /></>} />
+          
+          {/* User Routes */}
+          <Route path="/dashboard" element={<><Header /><Dashboard /></>} />
+          <Route path="/report" element={<><Header /><ReportIssue /></>} />
+          <Route path="/civic-guide" element={<><Header /><CivicGuide /></>} />
+          <Route path="/profile" element={<><Header /><Profile /></>} />
+          
+          {/* Admin Routes - No Header */}
           <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="*" element={<NotFound />} />
+          <Route path="/admin/issues" element={<AllIssues />} />
+          <Route path="/admin/analytics" element={<Analytics />} />
+          <Route path="/admin/manage-admins" element={<ManageAdmins />} />
+          <Route path="/admin/settings" element={<Settings />} />
+          
+          <Route path="*" element={<><Header /><NotFound /></>} />
         </Routes>
       </BrowserRouter>
     </TooltipProvider>
