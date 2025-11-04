@@ -24,9 +24,11 @@ export const Header = () => {
       setUser(session?.user ?? null);
     });
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      setUser(session?.user ?? null);
-    });
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (_event, session) => {
+        setUser(session?.user ?? null);
+      }
+    );
 
     return () => subscription.unsubscribe();
   }, []);
@@ -44,6 +46,7 @@ export const Header = () => {
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
       <nav className="container flex h-16 items-center justify-between">
+        {/* Logo */}
         <Link to="/" className="flex items-center space-x-2">
           <div className="h-8 w-8 rounded-lg bg-gradient-hero" />
           <span className="text-xl font-bold bg-gradient-hero bg-clip-text text-transparent">
@@ -51,27 +54,52 @@ export const Header = () => {
           </span>
         </Link>
 
-        {/* Desktop Navigation */}
+        {/* ---------------- Desktop Navigation ---------------- */}
         <div className="hidden md:flex items-center gap-6">
-          <Link to="/" className="text-sm font-medium hover:text-primary transition-colors">
+          <Link
+            to="/"
+            className="text-sm font-medium hover:text-primary transition-colors"
+          >
             {t('nav.home')}
           </Link>
+
           {user && (
             <>
-              <Link to="/report" className="text-sm font-medium hover:text-primary transition-colors">
+              <Link
+                to="/report"
+                className="text-sm font-medium hover:text-primary transition-colors"
+              >
                 {t('nav.report')}
               </Link>
-              <Link to="/dashboard" className="text-sm font-medium hover:text-primary transition-colors">
+
+              <Link
+                to="/dashboard"
+                className="text-sm font-medium hover:text-primary transition-colors"
+              >
                 {t('nav.dashboard')}
               </Link>
-              <Link to="/profile" className="text-sm font-medium hover:text-primary transition-colors">
+
+              {/* ✅ NEW Community / Feed link */}
+              <Link
+                to="/community"
+                className="text-sm font-medium hover:text-primary transition-colors"
+              >
+                Community
+              </Link>
+
+              <Link
+                to="/profile"
+                className="text-sm font-medium hover:text-primary transition-colors"
+              >
                 Profile
               </Link>
             </>
           )}
 
+          {/* Notification bell */}
           {user && <UserNotificationBell />}
-          
+
+          {/* Language selector */}
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" size="icon">
@@ -88,6 +116,7 @@ export const Header = () => {
             </DropdownMenuContent>
           </DropdownMenu>
 
+          {/* Login / Logout */}
           {user ? (
             <Button variant="outline" onClick={handleLogout}>
               <LogOut className="mr-2 h-4 w-4" />
@@ -100,7 +129,7 @@ export const Header = () => {
           )}
         </div>
 
-        {/* Mobile Menu Button */}
+        {/* ---------------- Mobile Menu Toggle ---------------- */}
         <button
           className="md:hidden"
           onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -109,28 +138,56 @@ export const Header = () => {
         </button>
       </nav>
 
-      {/* Mobile Menu */}
+      {/* ---------------- Mobile Menu ---------------- */}
       {mobileMenuOpen && (
         <div className="md:hidden border-t bg-background">
           <div className="container py-4 flex flex-col gap-4">
-            <Link to="/" className="text-sm font-medium hover:text-primary transition-colors">
+            <Link
+              to="/"
+              className="text-sm font-medium hover:text-primary transition-colors"
+            >
               {t('nav.home')}
             </Link>
+
             {user && (
               <>
-                <Link to="/report" className="text-sm font-medium hover:text-primary transition-colors">
+                <Link
+                  to="/report"
+                  className="text-sm font-medium hover:text-primary transition-colors"
+                >
                   {t('nav.report')}
                 </Link>
-                <Link to="/dashboard" className="text-sm font-medium hover:text-primary transition-colors">
+
+                <Link
+                  to="/dashboard"
+                  className="text-sm font-medium hover:text-primary transition-colors"
+                >
                   {t('nav.dashboard')}
                 </Link>
-                <Link to="/profile" className="text-sm font-medium hover:text-primary transition-colors">
+
+                {/* ✅ NEW Community / Feed link for mobile */}
+                <Link
+                  to="/community"
+                  className="text-sm font-medium hover:text-primary transition-colors"
+                >
+                  Community
+                </Link>
+
+                <Link
+                  to="/profile"
+                  className="text-sm font-medium hover:text-primary transition-colors"
+                >
                   Profile
-              </Link>
-            </>
+                </Link>
+              </>
             )}
+
             {user ? (
-              <Button variant="outline" onClick={handleLogout} className="w-full">
+              <Button
+                variant="outline"
+                onClick={handleLogout}
+                className="w-full"
+              >
                 <LogOut className="mr-2 h-4 w-4" />
                 Logout
               </Button>
