@@ -2,7 +2,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { Header } from "./components/Header";
 import { FloatingChatbot } from "./components/FloatingChatbot";
 import Home from "./pages/Home";
@@ -33,7 +33,20 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <FloatingChatbot />
+        {/* Render the floating chatbot on all non-admin routes */}
+        {/* ChatbotVisibility must be rendered inside BrowserRouter so useLocation works */}
+        {/* Define a small component that hides the bot on admin routes */}
+        {/* eslint-disable-next-line react/display-name */}
+        {(() => {
+          function ChatbotVisibility() {
+            const location = useLocation();
+            // hide on admin routes
+            if (location.pathname.startsWith('/admin')) return null;
+            return <FloatingChatbot />;
+          }
+
+          return <ChatbotVisibility />;
+        })()}
         <Routes>
           {/* 🌍 Public Routes */}
           <Route path="/" element={<><Header /><Home /></>} />
