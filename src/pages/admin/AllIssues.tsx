@@ -329,15 +329,27 @@ export default function AllIssues() {
                                   ? `${issue.area}, ${issue.district}, ${issue.state}`
                                   : 'Location not specified'}
                               </p>
-                              {issue.latitude && issue.longitude && (
-                                <a 
-                                  href={`https://www.google.com/maps?q=${issue.latitude},${issue.longitude}`}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="text-xs text-primary hover:underline"
-                                >
-                                  View on Map →
-                                </a>
+                              {issue.latitude !== null && issue.longitude !== null && (
+                                <div className="space-y-2">
+                                  <a
+                                    href={`https://www.google.com/maps?q=${issue.latitude},${issue.longitude}`}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="text-xs text-primary hover:underline"
+                                  >
+                                    View on Map →
+                                  </a>
+
+                                  {/* Small embedded map preview */}
+                                  <div className="mt-2 rounded-md overflow-hidden border hidden md:block">
+                                    <iframe
+                                      title={`map-preview-${issue.id}`}
+                                      src={`https://www.openstreetmap.org/export/embed.html?bbox=${issue.longitude - 0.01}%2C${issue.latitude - 0.01}%2C${issue.longitude + 0.01}%2C${issue.latitude + 0.01}&layer=mapnik&marker=${issue.latitude}%2C${issue.longitude}`}
+                                      style={{ width: '100%', height: '160px', border: 0 }}
+                                    />
+                                    <div className="p-2 text-xs text-muted-foreground">Preview. Click to open in OpenStreetMap.</div>
+                                  </div>
+                                </div>
                               )}
                             </div>
                           </div>

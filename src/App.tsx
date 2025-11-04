@@ -4,8 +4,12 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { Header } from "./components/Header";
+<<<<<<< HEAD
 
 // User Pages
+=======
+import { FloatingChatbot } from "./components/FloatingChatbot";
+>>>>>>> 949905ba54fc4674617491ad364d423873314628
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
@@ -34,6 +38,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <FloatingChatbot />
         <Routes>
           {/* 🌍 Public Routes */}
           <Route path="/" element={<><Header /><Home /></>} />

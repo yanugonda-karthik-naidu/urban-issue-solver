@@ -106,12 +106,12 @@ export default function IssueDetailsModal({ issue, open, onOpenChange }: IssueDe
                 <p className="font-medium">
                   {issue.area}, {issue.district}, {issue.state}
                 </p>
-                {issue.latitude && issue.longitude && (
+                {issue.latitude !== null && issue.longitude !== null && (
                   <div className="mt-2">
                     <p className="text-xs text-muted-foreground mb-2">
                       Coordinates: {issue.latitude.toFixed(6)}, {issue.longitude.toFixed(6)}
                     </p>
-                    <a 
+                    <a
                       href={`https://www.google.com/maps?q=${issue.latitude},${issue.longitude}`}
                       target="_blank"
                       rel="noopener noreferrer"
@@ -119,6 +119,16 @@ export default function IssueDetailsModal({ issue, open, onOpenChange }: IssueDe
                     >
                       View on Google Maps →
                     </a>
+
+                    {/* Embedded OpenStreetMap preview */}
+                    <div className="mt-3 rounded-md overflow-hidden border">
+                      <iframe
+                        title="issue-location-preview"
+                        src={`https://www.openstreetmap.org/export/embed.html?bbox=${issue.longitude - 0.01}%2C${issue.latitude - 0.01}%2C${issue.longitude + 0.01}%2C${issue.latitude + 0.01}&layer=mapnik&marker=${issue.latitude}%2C${issue.longitude}`}
+                        style={{ width: '100%', height: '280px', border: 0 }}
+                      />
+                      <div className="p-2 text-xs text-muted-foreground">Preview of the report location. Click to open in OpenStreetMap.</div>
+                    </div>
                   </div>
                 )}
               </div>
