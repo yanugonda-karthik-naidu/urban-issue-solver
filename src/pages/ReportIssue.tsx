@@ -336,6 +336,17 @@ export default function ReportIssue() {
                     GPS: {formData.latitude.toFixed(6)}, {formData.longitude.toFixed(6)}
                   </p>
                 )}
+                {formData.latitude && formData.longitude && (
+                  <div className="mt-2 rounded-md overflow-hidden border">
+                    {/* Small embedded map preview using OpenStreetMap */}
+                    <iframe
+                      title="location-preview"
+                      src={`https://www.openstreetmap.org/export/embed.html?bbox=${formData.longitude! - 0.01}%2C${formData.latitude! - 0.01}%2C${formData.longitude! + 0.01}%2C${formData.latitude! + 0.01}&layer=mapnik&marker=${formData.latitude}%2C${formData.longitude}`}
+                      style={{ width: '100%', height: '220px', border: 0 }}
+                    />
+                    <div className="p-2 text-xs text-muted-foreground">Preview of detected location. Click to open in OpenStreetMap.</div>
+                  </div>
+                )}
               </div>
 
               <div>
