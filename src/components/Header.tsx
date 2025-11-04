@@ -113,6 +113,12 @@ export const Header = () => {
               <DropdownMenuItem onClick={() => changeLanguage('hi')}>
                 हिंदी (Hindi)
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => changeLanguage('ta')}>
+                தமிழ் (Tamil)
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => changeLanguage('te')}>
+                తెలుగు (Telugu)
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
 

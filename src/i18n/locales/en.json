@@ -48,7 +48,8 @@
       "resolved": "Resolved"
     },
     "noReports": "No reports yet. Report your first issue!",
-    "reportIssue": "Report New Issue"
+    "reportIssue": "Report New Issue",
+    "locationNotSpecified": "Location not specified"
   },
   "report": {
     "title": "Report an Issue",
