@@ -172,7 +172,7 @@ export default function NotificationBell() {
               variant="ghost"
               size="sm"
               onClick={markAllAsRead}
-              className="h-auto p-0 text-xs text-primary"
+              className="h-auto p-0 text-xs text-primary hover:bg-transparent hover:border-transparent hover:text-primary/80 focus:outline-none focus:ring-0"
             >
               Mark all as read
             </Button>
