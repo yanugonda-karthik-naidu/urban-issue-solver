@@ -9,7 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { MapPin, Upload, X } from 'lucide-react';
+import { MapPin, Upload, X, Camera } from 'lucide-react';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 
@@ -31,6 +31,11 @@ export default function ReportIssue() {
   const [uploadedImages, setUploadedImages] = useState<string[]>([]);
   const [uploading, setUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [cameraActive, setCameraActive] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const [showCameraChoice, setShowCameraChoice] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -145,6 +150,72 @@ export default function ReportIssue() {
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const openCamera = async (facing: 'environment' | 'user' = 'environment') => {
+    try {
+      // On desktop, this will open the default webcam. On mobile, choose facing mode.
+      const constraints: MediaStreamConstraints = { video: { facingMode: facing } };
+      const stream = await navigator.mediaDevices.getUserMedia(constraints);
+      streamRef.current = stream;
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        await videoRef.current.play();
+      }
+      setCameraActive(true);
+      setShowCameraChoice(false);
+    } catch (err: any) {
+      console.error('Camera error:', err);
+      toast.error('Unable to access camera');
+      setShowCameraChoice(false);
+    }
+  };
+
+  const stopCamera = () => {
+    try {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach(t => t.stop());
+        streamRef.current = null;
+      }
+      if (videoRef.current) {
+        videoRef.current.pause();
+        videoRef.current.srcObject = null;
+      }
+    } catch (e) {
+      // ignore
+    }
+    setCameraActive(false);
+  };
+
+  const captureFromCamera = async () => {
+    if (!videoRef.current) return;
+    setUploading(true);
+    try {
+      const vw = videoRef.current.videoWidth;
+      const vh = videoRef.current.videoHeight;
+      if (!canvasRef.current) canvasRef.current = document.createElement('canvas');
+      const canvas = canvasRef.current;
+      canvas.width = vw || 1280;
+      canvas.height = vh || 720;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Unable to get canvas context');
+      ctx.drawImage(videoRef.current, 0, 0, canvas.width, canvas.height);
+
+      const blob: Blob | null = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg'));
+      if (!blob) throw new Error('Failed to capture image');
+
+      // convert blob to File for upload helper
+      const file = new File([blob], `camera-${Date.now()}.jpg`, { type: 'image/jpeg' });
+      const url = await uploadToCloudinary(file);
+      setUploadedImages(prev => [...prev, url]);
+      toast.success('Photo captured');
+    } catch (err: any) {
+      console.error('Capture error:', err);
+      toast.error(err?.message || 'Failed to capture photo');
+    } finally {
+      setUploading(false);
+      stopCamera();
     }
   };
 
@@ -283,8 +354,34 @@ export default function ReportIssue() {
                       <Upload className="mr-2 h-4 w-4" />
                       {uploading ? 'Uploading...' : t('report.uploadPhoto')}
                     </Button>
+                    <Button type="button" variant="ghost" className="ml-2" onClick={() => {
+                      // On mobile, show choice front/back. On desktop, open default webcam
+                      const isMobile = /Mobi|Android/i.test(navigator.userAgent || '');
+                      if (isMobile) setShowCameraChoice((s) => !s);
+                      else openCamera('user');
+                    }}>
+                      <Camera className="mr-1" />
+                      Camera
+                    </Button>
                   </div>
+                  {showCameraChoice && (
+                    <div className="mt-2 flex gap-2">
+                      <Button size="sm" onClick={() => openCamera('environment')}>Use rear camera</Button>
+                      <Button size="sm" variant="ghost" onClick={() => openCamera('user')}>Use front camera</Button>
+                    </div>
+                  )}
 
+                  {cameraActive && (
+                    <div className="mt-3">
+                      <div className="relative">
+                        <video ref={videoRef} className="w-full rounded-md bg-black" playsInline />
+                        <div className="absolute top-2 right-2 flex gap-2">
+                          <Button size="sm" onClick={captureFromCamera} disabled={uploading}>Capture</Button>
+                          <Button size="sm" variant="ghost" onClick={stopCamera}>Close</Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                   {uploadedImages.length > 0 && (
                     <div className="mt-3 flex gap-2 flex-wrap">
                       {uploadedImages.map((url, index) => (
