@@ -89,7 +89,35 @@ export default function ReportIssue() {
           issue_id: newIssue.id,
         }));
 
-        await supabase.from('notifications').insert(notifications);
+        try {
+          // Prefer calling the Edge Function if configured (recommended)
+          const functionsBase = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL;
+          if (functionsBase) {
+            const funcUrl = `${functionsBase.replace(/\/$/, '')}/create-admin-notifications`;
+            const res = await fetch(funcUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ notifications }),
+            });
+
+            const result = await res.json().catch(() => ({}));
+            if (!res.ok) {
+              console.error('Function failed to create notifications', result);
+            } else {
+              console.log('Inserted admin notifications via function', result);
+            }
+          } else {
+            // Fallback: try to insert directly (may fail due to RLS). This provides a better error message.
+            const { data: notifResult, error: notifError } = await supabase.from('notifications').insert(notifications);
+            if (notifError) {
+              console.error('Failed to insert admin notifications directly (missing VITE_SUPABASE_FUNCTIONS_URL?). RLS or permissions likely blocked this operation.', notifError);
+            } else {
+              console.log('Inserted admin notifications directly', notifResult);
+            }
+          }
+        } catch (err) {
+          console.error('Failed to create admin notifications', err);
+        }
       }
 
       toast.success('Issue reported successfully!');

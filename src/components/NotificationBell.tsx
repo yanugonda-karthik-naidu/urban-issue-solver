@@ -31,8 +31,16 @@ export default function NotificationBell() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    fetchNotifications();
-    subscribeToNotifications();
+    let cleanupFn: (() => void) | undefined;
+
+    (async () => {
+      await fetchNotifications();
+      cleanupFn = await subscribeToNotifications();
+    })();
+
+    return () => {
+      if (cleanupFn) cleanupFn();
+    };
   }, []);
 
   const fetchNotifications = async () => {
@@ -55,15 +63,20 @@ export default function NotificationBell() {
     setUnreadCount(data?.filter(n => !n.read).length || 0);
   };
 
-  const subscribeToNotifications = () => {
+  const subscribeToNotifications = async (): Promise<() => void> => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return () => {};
+
+    // Subscribe only to notifications for the current user to avoid extra noise
     const channel = supabase
-      .channel('notifications-changes')
+      .channel(`notifications-changes-${user.id}`)
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
           table: 'notifications',
+          filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
           if (payload.eventType === 'INSERT') {

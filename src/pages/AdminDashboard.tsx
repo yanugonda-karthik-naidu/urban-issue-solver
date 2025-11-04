@@ -137,6 +137,20 @@ export default function AdminDashboard() {
           console.log('Real-time update received:', payload);
           // Fetch fresh data whenever any change occurs
           fetchDashboardData();
+
+          // If this is a new INSERT (user created a report), notify admins
+          try {
+            const p: any = payload as any;
+            const evt = p.eventType || p.type || p.event;
+            const isInsert = evt === 'INSERT' || evt === 'insert' || (!!p.new && !p.old);
+            if (isInsert) {
+              const title = p.new?.title || p.record?.title || 'New report';
+              // Show a simple toast; navigation action can be done from the Admin UI
+              toast.info(`New report submitted: "${title}"`);
+            }
+          } catch (e) {
+            console.error('Error handling realtime payload:', e);
+          }
         }
       )
       .subscribe();
