@@ -50,7 +50,7 @@ export const Header = () => {
         <Link to="/" className="flex items-center space-x-2">
           <div className="h-8 w-8 rounded-lg bg-gradient-hero" />
           <span className="text-xl font-bold bg-gradient-hero bg-clip-text text-transparent">
-            CivicReport
+            UrbanReporter
           </span>
         </Link>
 
