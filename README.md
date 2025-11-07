@@ -203,10 +203,6 @@ This project is specifically designed for hackathons and demos with:
 - Comprehensive feature set
 - Easy deployment
 
-## 📞 Support
-
-For support, email support@civicreport.app or join our Discord community.
-
 ---
 
 Built with ❤️
