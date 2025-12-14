@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dialog';
 import { AlertCircle, CheckCircle2, Clock, Plus } from 'lucide-react';
 import { toast } from 'sonner';
+import { StatusTimeline } from '@/components/StatusTimeline';
 
 interface Issue {
   id: string;
@@ -297,6 +298,16 @@ export default function Dashboard() {
 
             {selectedIssue && (
               <div className="mt-4 space-y-4">
+                {/* Visual Status Timeline */}
+                <div className="p-4 bg-muted/30 rounded-lg">
+                  <StatusTimeline
+                    currentStatus={selectedIssue.status}
+                    createdAt={selectedIssue.created_at}
+                    updatedAt={selectedIssue.created_at}
+                    adminRemarks={selectedIssue.admin_remarks}
+                  />
+                </div>
+                
                 <div>
                   <p className="text-sm font-medium mb-1">Description</p>
                   <p className="text-sm text-muted-foreground">{selectedIssue.description}</p>
@@ -305,13 +316,6 @@ export default function Dashboard() {
                 {selectedIssue.photo_url && (
                   <div>
                     <img src={selectedIssue.photo_url} alt={selectedIssue.title} className="w-full max-h-80 object-cover rounded-md" />
-                  </div>
-                )}
-
-                {selectedIssue.admin_remarks && (
-                  <div className="p-4 bg-primary/5 rounded-lg border border-primary/10">
-                    <p className="text-sm font-medium mb-2">Admin Update</p>
-                    <p className="text-sm text-muted-foreground">{selectedIssue.admin_remarks}</p>
                   </div>
                 )}
               </div>
