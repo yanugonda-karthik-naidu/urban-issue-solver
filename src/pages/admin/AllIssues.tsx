@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import IssueDetailsModal from '@/components/admin/IssueDetailsModal';
+import { AdminRemarksSchema } from '@/lib/validation';
 
 interface Issue {
   id: string;
@@ -43,38 +44,14 @@ export default function AllIssues() {
   const [filter, setFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  const [isAdmin, setIsAdmin] = useState(false);
   const [editingRemarks, setEditingRemarks] = useState<{ [key: string]: string }>({});
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
-    const checkAdminAndFetch = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        navigate('/login');
-        return;
-      }
-
-      const { data: adminData } = await supabase
-        .from('admins')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .single();
-
-      if (!adminData) {
-        toast.error('Access denied. Admin privileges required.');
-        navigate('/dashboard');
-        return;
-      }
-
-      setIsAdmin(true);
-      fetchIssues();
-    };
-
-    checkAdminAndFetch();
-  }, [navigate]);
+    // AdminRoute handles auth check, just fetch data
+    fetchIssues();
+  }, []);
 
   const fetchIssues = async () => {
     try {
@@ -112,8 +89,6 @@ export default function AllIssues() {
   };
 
   useEffect(() => {
-    if (!isAdmin) return;
-
     // Set up real-time subscription for automatic updates
     const channel = supabase
       .channel('admin-all-issues-changes')
@@ -140,7 +115,7 @@ export default function AllIssues() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isAdmin]);
+  }, []);
 
   const updateStatus = async (issueId: string, newStatus: string, userId: string) => {
     try {
@@ -174,6 +149,13 @@ export default function AllIssues() {
   };
 
   const updateRemarks = async (issueId: string, remarks: string) => {
+    // Validate remarks
+    const validationResult = AdminRemarksSchema.safeParse(remarks);
+    if (!validationResult.success) {
+      toast.error(validationResult.error.errors[0].message);
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('issues')
@@ -224,10 +206,6 @@ export default function AllIssues() {
     );
 
   const uniqueCategories = Array.from(new Set(issues.map((i) => i.category)));
-
-  if (!isAdmin) {
-    return null;
-  }
 
   return (
     <div className="flex min-h-screen bg-background">

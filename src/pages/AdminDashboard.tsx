@@ -29,7 +29,6 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 export default function AdminDashboard() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [stats, setStats] = useState<Stats>({
     total: 0,
     pending: 0,
@@ -41,32 +40,9 @@ export default function AdminDashboard() {
   const [recentIssues, setRecentIssues] = useState<any[]>([]);
 
   useEffect(() => {
-    const checkAdminAndFetch = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        navigate('/login');
-        return;
-      }
-
-      const { data: adminData } = await supabase
-        .from('admins')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .single();
-
-      if (!adminData) {
-        toast.error('Access denied. Admin privileges required.');
-        navigate('/dashboard');
-        return;
-      }
-
-      setIsAdmin(true);
-      fetchDashboardData();
-    };
-
-    checkAdminAndFetch();
-  }, [navigate]);
+    // AdminRoute handles auth check, just fetch data
+    fetchDashboardData();
+  }, []);
 
   const fetchDashboardData = async () => {
     try {
@@ -121,8 +97,6 @@ export default function AdminDashboard() {
   };
 
   useEffect(() => {
-    if (!isAdmin) return;
-
     // Set up real-time subscription for automatic updates
     const channel = supabase
       .channel('admin-dashboard-changes')
@@ -158,7 +132,7 @@ export default function AdminDashboard() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isAdmin]);
+  }, []);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -170,10 +144,6 @@ export default function AdminDashboard() {
         return 'text-warning';
     }
   };
-
-  if (!isAdmin) {
-    return null;
-  }
 
   return (
     <div className="flex min-h-screen bg-background">
