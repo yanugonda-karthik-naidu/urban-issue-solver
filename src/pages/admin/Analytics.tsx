@@ -6,7 +6,8 @@ import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { Card, CardContent } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { TrendingUp, MapPin } from 'lucide-react';
+import { TrendingUp, MapPin, Brain } from 'lucide-react';
+import { IssueHeatmap } from '@/components/IssueHeatmap';
 
 interface CategoryData {
   name: string;
@@ -18,18 +19,31 @@ interface DailyData {
   count: number;
 }
 
+interface Issue {
+  id: string;
+  area: string | null;
+  district: string | null;
+  state: string | null;
+  category: string;
+  status: string;
+  latitude: number | null;
+  longitude: number | null;
+  created_at: string;
+}
+
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
 export default function Analytics() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
+  const [allIssues, setAllIssues] = useState<Issue[]>([]);
   const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
   const [statusData, setStatusData] = useState<any[]>([]);
   const [dailyData, setDailyData] = useState<DailyData[]>([]);
   const [areaData, setAreaData] = useState<CategoryData[]>([]);
+  const [weeklyTrend, setWeeklyTrend] = useState<string>('');
 
   useEffect(() => {
-    // AdminRoute handles auth check, just fetch data
     fetchAnalyticsData();
   }, []);
 
@@ -41,6 +55,8 @@ export default function Analytics() {
         .order('created_at', { ascending: false });
 
       if (error) throw error;
+
+      setAllIssues(issues as Issue[] || []);
 
       // Category data
       const categories = issues?.reduce((acc: any, issue) => {
@@ -97,6 +113,15 @@ export default function Analytics() {
 
       setAreaData(areaArray);
 
+      // Generate weekly trend insight
+      const thisWeekCount = dailyCounts.reduce((sum, d) => sum + d.count, 0);
+      const trend = thisWeekCount > 10 
+        ? '📈 High activity this week. Consider increasing team capacity.'
+        : thisWeekCount > 5 
+        ? '📊 Moderate activity. Normal operations recommended.'
+        : '✅ Low activity. Good time for preventive maintenance tasks.';
+      setWeeklyTrend(trend);
+
     } catch (error) {
       console.error('Error fetching analytics:', error);
       toast.error('Failed to load analytics data');
@@ -105,7 +130,6 @@ export default function Analytics() {
     }
   };
 
-  // Set up real-time updates for analytics
   useEffect(() => {
     const channel = supabase
       .channel('admin-analytics-changes')
@@ -116,9 +140,7 @@ export default function Analytics() {
           schema: 'public',
           table: 'issues',
         },
-        (payload) => {
-          console.log('Analytics update:', payload);
-          // Refetch analytics when data changes
+        () => {
           fetchAnalyticsData();
         }
       )
@@ -146,6 +168,13 @@ export default function Analytics() {
               <h1 className="text-3xl font-bold">Analytics & Reports</h1>
 
               <div className="grid gap-6 md:grid-cols-2">
+                {/* Issue Heatmap - Full Width */}
+                <Card className="shadow-soft md:col-span-2">
+                  <CardContent className="pt-6">
+                    <IssueHeatmap issues={allIssues} />
+                  </CardContent>
+                </Card>
+
                 {/* Issues by Category */}
                 <Card className="shadow-soft">
                   <CardContent className="pt-6">
@@ -192,10 +221,10 @@ export default function Analytics() {
                   </CardContent>
                 </Card>
 
-                {/* Daily Submissions (Last 7 Days) */}
+                {/* Daily Submissions */}
                 <Card className="shadow-soft">
                   <CardContent className="pt-6">
-                    <h3 className="text-lg font-semibold mb-4">Daily Issue Submissions</h3>
+                    <h3 className="text-lg font-semibold mb-4">Daily Issue Submissions (7 days)</h3>
                     <ResponsiveContainer width="100%" height={300}>
                       <LineChart data={dailyData}>
                         <CartesianGrid strokeDasharray="3 3" />
@@ -209,7 +238,7 @@ export default function Analytics() {
                   </CardContent>
                 </Card>
 
-                {/* Top 5 Areas by Issues */}
+                {/* Top 5 Areas */}
                 <Card className="shadow-soft">
                   <CardContent className="pt-6">
                     <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
@@ -255,6 +284,19 @@ export default function Analytics() {
                         {areaData.length > 0 ? areaData[0].name : 'N/A'}
                       </p>
                     </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* AI Weekly Trend */}
+              <Card className="shadow-soft">
+                <CardContent className="pt-6">
+                  <div className="flex items-center gap-2 mb-4">
+                    <Brain className="h-5 w-5 text-primary" />
+                    <h3 className="text-lg font-semibold">AI Weekly Summary</h3>
+                  </div>
+                  <div className="p-4 bg-primary/5 border border-primary/20 rounded-lg">
+                    <p className="text-sm">{weeklyTrend || 'Analyzing trends...'}</p>
                   </div>
                 </CardContent>
               </Card>

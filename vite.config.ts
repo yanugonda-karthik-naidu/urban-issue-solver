@@ -15,41 +15,84 @@ export default defineConfig(({ mode }) => ({
     mode === 'development' && componentTagger(),
     VitePWA({
       registerType: 'autoUpdate',
+      includeAssets: ['favicon.ico', 'icon-192.png', 'icon-512.png'],
       manifest: {
-        name: 'CivicReport - Urban Issue Reporting',
+        name: 'CivicReport - Smart Urban Issue Reporting',
         short_name: 'CivicReport',
-        description: 'Report and track civic issues in your community',
+        description: 'AI-powered civic issue reporting and tracking platform',
         theme_color: '#4299e1',
         background_color: '#ffffff',
         display: 'standalone',
+        orientation: 'portrait-primary',
+        start_url: '/',
+        scope: '/',
         icons: [
           {
             src: '/icon-192.png',
             sizes: '192x192',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any maskable'
           },
           {
             src: '/icon-512.png',
             sizes: '512x512',
-            type: 'image/png'
+            type: 'image/png',
+            purpose: 'any maskable'
           }
-        ]
+        ],
+        categories: ['government', 'utilities', 'productivity'],
+        screenshots: []
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg}'],
+        globPatterns: ['**/*.{js,css,html,ico,png,svg,jpg,woff,woff2}'],
+        cleanupOutdatedCaches: true,
+        skipWaiting: true,
+        clientsClaim: true,
         runtimeCaching: [
           {
-            urlPattern: /^https:\/\/firebasestorage\.googleapis\.com\/.*/i,
+            urlPattern: /^https:\/\/res\.cloudinary\.com\/.*/i,
             handler: 'CacheFirst',
             options: {
-              cacheName: 'firebase-images',
+              cacheName: 'cloudinary-images',
+              expiration: {
+                maxEntries: 100,
+                maxAgeSeconds: 60 * 60 * 24 * 30 // 30 days
+              },
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          {
+            urlPattern: /^https:\/\/cdkvkewrwwxatiayykln\.supabase\.co\/rest\/v1\/.*/i,
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'supabase-api',
               expiration: {
                 maxEntries: 50,
-                maxAgeSeconds: 60 * 60 * 24 * 30
+                maxAgeSeconds: 60 * 5 // 5 minutes
+              },
+              networkTimeoutSeconds: 10,
+              cacheableResponse: {
+                statuses: [0, 200]
+              }
+            }
+          },
+          {
+            urlPattern: /^https:\/\/.*\.openstreetmap\.org\/.*/i,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'map-tiles',
+              expiration: {
+                maxEntries: 200,
+                maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
               }
             }
           }
         ]
+      },
+      devOptions: {
+        enabled: false
       }
     })
   ].filter(Boolean),

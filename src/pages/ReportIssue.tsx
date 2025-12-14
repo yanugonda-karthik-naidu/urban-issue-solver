@@ -9,10 +9,12 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { MapPin, Upload, X, Camera } from 'lucide-react';
+import { MapPin, Upload, X, Camera, Shield } from 'lucide-react';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { IssueFormSchema } from '@/lib/validation';
+import { useDuplicateDetection } from '@/hooks/useDuplicateDetection';
+import { DuplicateWarning } from '@/components/DuplicateWarning';
 
 export default function ReportIssue() {
   const { t } = useTranslation();
@@ -37,6 +39,9 @@ export default function ReportIssue() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const [showCameraChoice, setShowCameraChoice] = useState(false);
+  const { checking, result: duplicateResult, checkForDuplicates, clearResult } = useDuplicateDetection();
+  const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
+  const [bypassDuplicateCheck, setBypassDuplicateCheck] = useState(false);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -69,6 +74,23 @@ export default function ReportIssue() {
       const firstError = validationResult.error.errors[0];
       toast.error(firstError.message);
       return;
+    }
+
+    // Check for duplicates if not bypassed
+    if (!bypassDuplicateCheck) {
+      const duplicateCheck = await checkForDuplicates({
+        title: formData.title,
+        description: formData.description,
+        category: formData.category,
+        latitude: formData.latitude,
+        longitude: formData.longitude,
+        userId,
+      });
+
+      if (duplicateCheck.similarIssues.length > 0) {
+        setShowDuplicateWarning(true);
+        return;
+      }
     }
 
     setLoading(true);
@@ -256,6 +278,27 @@ export default function ReportIssue() {
             <CardTitle className="text-2xl">{t('report.title')}</CardTitle>
           </CardHeader>
           <CardContent>
+            {/* Duplicate Warning */}
+            {showDuplicateWarning && duplicateResult?.similarIssues && (
+              <div className="mb-6">
+                <DuplicateWarning
+                  similarIssues={duplicateResult.similarIssues}
+                  onDismiss={() => {
+                    setShowDuplicateWarning(false);
+                    clearResult();
+                  }}
+                  onProceedAnyway={() => {
+                    setBypassDuplicateCheck(true);
+                    setShowDuplicateWarning(false);
+                    // Re-trigger submit
+                    setTimeout(() => {
+                      document.querySelector('form')?.requestSubmit();
+                    }, 100);
+                  }}
+                />
+              </div>
+            )}
+
             <form onSubmit={handleSubmit} className="space-y-6">
               <div>
                 <Label htmlFor="category">{t('report.category')}</Label>
