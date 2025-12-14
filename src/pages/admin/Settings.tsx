@@ -9,12 +9,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { ProfileSchema } from '@/lib/validation';
 
 export default function Settings() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [profile, setProfile] = useState({
     full_name: '',
     email: '',
@@ -25,32 +25,15 @@ export default function Settings() {
   });
 
   useEffect(() => {
-    const checkAdminAndFetch = async () => {
+    // AdminRoute handles auth check, fetch profile
+    const loadProfile = async () => {
       const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        navigate('/login');
-        return;
+      if (session) {
+        fetchProfile(session.user.id);
       }
-
-      const { data: adminData } = await supabase
-        .from('admins')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .single();
-
-      if (!adminData) {
-        toast.error('Access denied. Admin privileges required.');
-        navigate('/dashboard');
-        return;
-      }
-
-      setIsAdmin(true);
-      fetchProfile(session.user.id);
     };
-
-    checkAdminAndFetch();
-  }, [navigate]);
+    loadProfile();
+  }, []);
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -81,6 +64,19 @@ export default function Settings() {
   };
 
   const handleSave = async () => {
+    // Validate profile data
+    const validationResult = ProfileSchema.safeParse({
+      full_name: profile.full_name,
+      phone: profile.phone,
+      district: profile.district,
+      state: profile.state,
+    });
+
+    if (!validationResult.success) {
+      toast.error(validationResult.error.errors[0].message);
+      return;
+    }
+
     setSaving(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -106,10 +102,6 @@ export default function Settings() {
       setSaving(false);
     }
   };
-
-  if (!isAdmin) {
-    return null;
-  }
 
   return (
     <div className="flex min-h-screen bg-background">

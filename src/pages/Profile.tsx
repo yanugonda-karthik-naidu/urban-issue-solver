@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { User, Mail, Phone, MapPin } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { ProfileSchema } from '@/lib/validation';
 
 type Profile = {
   id: string;
@@ -68,6 +69,21 @@ export default function Profile() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userId) return;
+
+    // Validate profile data
+    const validationResult = ProfileSchema.safeParse({
+      full_name: profile.full_name,
+      phone: profile.phone,
+      address: profile.address,
+      area: profile.area,
+      district: profile.district,
+      state: profile.state,
+    });
+
+    if (!validationResult.success) {
+      toast.error(validationResult.error.errors[0].message);
+      return;
+    }
 
     setLoading(true);
 

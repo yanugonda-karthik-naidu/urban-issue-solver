@@ -23,39 +23,15 @@ const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 export default function Analytics() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
   const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
   const [statusData, setStatusData] = useState<any[]>([]);
   const [dailyData, setDailyData] = useState<DailyData[]>([]);
   const [areaData, setAreaData] = useState<CategoryData[]>([]);
 
   useEffect(() => {
-    const checkAdminAndFetch = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        navigate('/login');
-        return;
-      }
-
-      const { data: adminData } = await supabase
-        .from('admins')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .single();
-
-      if (!adminData) {
-        toast.error('Access denied. Admin privileges required.');
-        navigate('/dashboard');
-        return;
-      }
-
-      setIsAdmin(true);
-      fetchAnalyticsData();
-    };
-
-    checkAdminAndFetch();
-  }, [navigate]);
+    // AdminRoute handles auth check, just fetch data
+    fetchAnalyticsData();
+  }, []);
 
   const fetchAnalyticsData = async () => {
     try {
@@ -131,8 +107,6 @@ export default function Analytics() {
 
   // Set up real-time updates for analytics
   useEffect(() => {
-    if (!isAdmin) return;
-
     const channel = supabase
       .channel('admin-analytics-changes')
       .on(
@@ -153,11 +127,7 @@ export default function Analytics() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [isAdmin]);
-
-  if (!isAdmin) {
-    return null;
-  }
+  }, []);
 
   return (
     <div className="flex min-h-screen bg-background">

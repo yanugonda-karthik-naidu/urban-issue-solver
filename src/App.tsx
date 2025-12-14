@@ -5,13 +5,14 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { Header } from "./components/Header";
 import { FloatingChatbot } from "./components/FloatingChatbot";
+import { AdminRoute } from "./components/auth/AdminRoute";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import ReportIssue from "./pages/ReportIssue";
 import CivicGuide from "./pages/CivicGuide";
 import Profile from "./pages/Profile";
-import PostFeed from "./pages/PostFeed"; // ✅ Community page
+import PostFeed from "./pages/PostFeed";
 
 // Admin Pages
 import AdminDashboard from "./pages/AdminDashboard";
@@ -61,12 +62,12 @@ const App = () => (
           {/* 🌐 New Community Page */}
           <Route path="/community" element={<><Header /><PostFeed /></>} />  {/* ✅ Added */}
 
-          {/* 🧑‍💼 Admin Routes (No Header) */}
-          <Route path="/admin" element={<AdminDashboard />} />
-          <Route path="/admin/issues" element={<AllIssues />} />
-          <Route path="/admin/analytics" element={<Analytics />} />
-          <Route path="/admin/manage-admins" element={<ManageAdmins />} />
-          <Route path="/admin/settings" element={<Settings />} />
+          {/* 🧑‍💼 Admin Routes - Protected with AdminRoute guard */}
+          <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
+          <Route path="/admin/issues" element={<AdminRoute><AllIssues /></AdminRoute>} />
+          <Route path="/admin/analytics" element={<AdminRoute><Analytics /></AdminRoute>} />
+          <Route path="/admin/manage-admins" element={<AdminRoute><ManageAdmins /></AdminRoute>} />
+          <Route path="/admin/settings" element={<AdminRoute><Settings /></AdminRoute>} />
 
           {/* 🚫 404 Route */}
           <Route path="*" element={<><Header /><NotFound /></>} />

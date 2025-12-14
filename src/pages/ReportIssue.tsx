@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 import { MapPin, Upload, X, Camera } from 'lucide-react';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { IssueFormSchema } from '@/lib/validation';
 
 export default function ReportIssue() {
   const { t } = useTranslation();
@@ -56,8 +57,17 @@ export default function ReportIssue() {
       return;
     }
 
-    if (!formData.title || !formData.description || !formData.category) {
-      toast.error('Please fill all required fields');
+    // Validate form data with zod
+    const validationResult = IssueFormSchema.safeParse({
+      ...formData,
+      area: formData.area || undefined,
+      district: formData.district || undefined,
+      state: formData.state || undefined,
+    });
+
+    if (!validationResult.success) {
+      const firstError = validationResult.error.errors[0];
+      toast.error(firstError.message);
       return;
     }
 

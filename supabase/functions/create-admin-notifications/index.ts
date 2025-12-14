@@ -6,6 +6,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Valid notification types
+const VALID_NOTIFICATION_TYPES = ['new_issue', 'status_update'];
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -47,16 +50,35 @@ serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Invalid payload: notifications array required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Validate notification structure
+    // Validate notification structure and content
     for (const notif of notifications) {
       if (!notif.user_id || !notif.title || !notif.message || !notif.type) {
-        return new Response(JSON.stringify({ error: 'Invalid notification structure' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        return new Response(JSON.stringify({ error: 'Invalid notification structure: user_id, title, message, and type are required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      // Validate content length
+      if (notif.title.length > 200) {
+        return new Response(JSON.stringify({ error: 'Notification title must be less than 200 characters' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      if (notif.message.length > 500) {
+        return new Response(JSON.stringify({ error: 'Notification message must be less than 500 characters' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      // Validate notification type
+      if (!VALID_NOTIFICATION_TYPES.includes(notif.type)) {
+        return new Response(JSON.stringify({ error: `Invalid notification type. Must be one of: ${VALID_NOTIFICATION_TYPES.join(', ')}` }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
     }
 
+    // Use service role client for checking existing notifications
+    const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+      auth: { persistSession: false }
+    });
+
     // If issue_id is provided, verify the user owns the issue (for new issue notifications)
     if (issue_id) {
-      const { data: issue, error: issueError } = await userClient.from('issues').select('user_id').eq('id', issue_id).single();
+      const { data: issue, error: issueError } = await userClient.from('issues').select('user_id, created_at').eq('id', issue_id).single();
       if (issueError || !issue) {
         console.error('Issue not found:', issueError?.message);
         return new Response(JSON.stringify({ error: 'Issue not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -65,12 +87,33 @@ serve(async (req) => {
         console.error('User does not own the issue');
         return new Response(JSON.stringify({ error: 'Forbidden: You can only notify about your own issues' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
-    }
 
-    // Use service role to insert notifications (bypasses RLS)
-    const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-      auth: { persistSession: false }
-    });
+      // Idempotency check: prevent duplicate notifications for the same issue
+      const { data: existingNotifications } = await adminClient
+        .from('notifications')
+        .select('id')
+        .eq('issue_id', issue_id)
+        .eq('type', 'new_issue')
+        .limit(1);
+      
+      if (existingNotifications && existingNotifications.length > 0) {
+        console.log('Notifications already exist for this issue, skipping');
+        return new Response(
+          JSON.stringify({ data: null, success: true, message: 'Notifications already created for this issue' }),
+          { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Time-based validation: only allow notification creation within 60 seconds of issue creation
+      const issueAge = Date.now() - new Date(issue.created_at).getTime();
+      if (issueAge > 60000) {
+        console.error('Issue is too old to create notifications for');
+        return new Response(
+          JSON.stringify({ error: 'Notifications can only be created immediately after issue creation' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+    }
 
     const { data, error } = await adminClient.from('notifications').insert(notifications);
     if (error) {

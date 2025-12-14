@@ -9,39 +9,11 @@ import { Card, CardContent } from '@/components/ui/card';
 export default function ManageAdmins() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    const checkAdmin = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
-      if (!session) {
-        navigate('/login');
-        return;
-      }
-
-      const { data: adminData } = await supabase
-        .from('admins')
-        .select('*')
-        .eq('user_id', session.user.id)
-        .single();
-
-      if (!adminData) {
-        toast.error('Access denied. Admin privileges required.');
-        navigate('/dashboard');
-        return;
-      }
-
-      setIsAdmin(true);
-      setLoading(false);
-    };
-
-    checkAdmin();
-  }, [navigate]);
-
-  if (!isAdmin) {
-    return null;
-  }
+    // AdminRoute handles auth check
+    setLoading(false);
+  }, []);
 
   return (
     <div className="flex min-h-screen bg-background">
