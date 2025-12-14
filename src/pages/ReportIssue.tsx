@@ -95,33 +95,27 @@ export default function ReportIssue() {
         }));
 
         try {
-          // Prefer calling the Edge Function if configured (recommended)
-          const functionsBase = import.meta.env.VITE_SUPABASE_FUNCTIONS_URL;
-          if (functionsBase) {
-            const funcUrl = `${functionsBase.replace(/\/$/, '')}/create-admin-notifications`;
-            const res = await fetch(funcUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ notifications }),
+          // Get the current session to pass the auth token
+          const { data: { session } } = await supabase.auth.getSession();
+          if (!session) {
+            console.error('No session found for notification creation');
+          } else {
+            // Call the edge function with authentication
+            const { data: funcResult, error: funcError } = await supabase.functions.invoke('create-admin-notifications', {
+              body: { 
+                notifications,
+                issue_id: newIssue.id 
+              }
             });
 
-            const result = await res.json().catch(() => ({}));
-            if (!res.ok) {
-              console.error('Function failed to create notifications', result);
+            if (funcError) {
+              console.error('Function failed to create notifications:', funcError);
             } else {
-              console.log('Inserted admin notifications via function', result);
-            }
-          } else {
-            // Fallback: try to insert directly (may fail due to RLS). This provides a better error message.
-            const { data: notifResult, error: notifError } = await supabase.from('notifications').insert(notifications);
-            if (notifError) {
-              console.error('Failed to insert admin notifications directly (missing VITE_SUPABASE_FUNCTIONS_URL?). RLS or permissions likely blocked this operation.', notifError);
-            } else {
-              console.log('Inserted admin notifications directly', notifResult);
+              console.log('Inserted admin notifications via function:', funcResult);
             }
           }
         } catch (err) {
-          console.error('Failed to create admin notifications', err);
+          console.error('Failed to create admin notifications:', err);
         }
       }
 

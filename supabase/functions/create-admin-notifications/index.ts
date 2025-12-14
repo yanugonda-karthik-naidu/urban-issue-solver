@@ -10,32 +10,76 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    const body = await req.json();
-    // Expect body to contain: notifications: Array<{ user_id, title, message, type, issue_id }>
-    const { notifications } = body;
-    if (!notifications || !Array.isArray(notifications)) {
-      return new Response(JSON.stringify({ error: 'Invalid payload' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
+    const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
+    const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
+    const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
 
-    const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || Deno.env.get('VITE_SUPABASE_URL');
-    const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('SERVICE_ROLE_KEY');
-
-    if (!SUPABASE_URL || !SERVICE_ROLE_KEY) {
-      console.error('Missing SUPABASE_URL or SERVICE_ROLE_KEY in function environment');
+    if (!SUPABASE_URL || !SUPABASE_ANON_KEY || !SERVICE_ROLE_KEY) {
+      console.error('Missing required environment variables');
       return new Response(JSON.stringify({ error: 'Server misconfigured' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
+    // Verify the user is authenticated
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      console.error('No authorization header provided');
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Create a client with the user's auth token to verify their identity
+    const userClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false }
+    });
+
+    const { data: { user }, error: authError } = await userClient.auth.getUser();
+    if (authError || !user) {
+      console.error('Authentication failed:', authError?.message || 'No user found');
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    console.log('Authenticated user:', user.id);
+
+    const body = await req.json();
+    const { notifications, issue_id } = body;
+
+    if (!notifications || !Array.isArray(notifications) || notifications.length === 0) {
+      return new Response(JSON.stringify({ error: 'Invalid payload: notifications array required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // Validate notification structure
+    for (const notif of notifications) {
+      if (!notif.user_id || !notif.title || !notif.message || !notif.type) {
+        return new Response(JSON.stringify({ error: 'Invalid notification structure' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
+
+    // If issue_id is provided, verify the user owns the issue (for new issue notifications)
+    if (issue_id) {
+      const { data: issue, error: issueError } = await userClient.from('issues').select('user_id').eq('id', issue_id).single();
+      if (issueError || !issue) {
+        console.error('Issue not found:', issueError?.message);
+        return new Response(JSON.stringify({ error: 'Issue not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      if (issue.user_id !== user.id) {
+        console.error('User does not own the issue');
+        return new Response(JSON.stringify({ error: 'Forbidden: You can only notify about your own issues' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
+
+    // Use service role to insert notifications (bypasses RLS)
     const adminClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
       auth: { persistSession: false }
     });
 
     const { data, error } = await adminClient.from('notifications').insert(notifications);
     if (error) {
-      console.error('Failed to insert notifications in function:', error);
+      console.error('Failed to insert notifications:', error);
       return new Response(JSON.stringify({ error: error.message }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    return new Response(JSON.stringify({ data }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    console.log('Notifications created successfully for user:', user.id);
+    return new Response(JSON.stringify({ data, success: true }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   } catch (err) {
     console.error('create-admin-notifications error:', err);
     return new Response(JSON.stringify({ error: err instanceof Error ? err.message : String(err) }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
