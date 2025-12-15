@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import { TrendingUp, MapPin, Brain } from 'lucide-react';
-import { IssueHeatmap } from '@/components/IssueHeatmap';
+import IssueHeatmap from '@/components/IssueHeatmap';
+import { DepartmentPerformance } from '@/components/admin/DepartmentPerformance';
+import { useDepartments } from '@/hooks/useDepartments';
+import { TrendingUp, Building2 } from 'lucide-react';
 
 interface CategoryData {
   name: string;

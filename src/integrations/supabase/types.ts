@@ -16,21 +16,141 @@ export type Database = {
     Tables: {
       admins: {
         Row: {
+          assigned_areas: string[] | null
+          assigned_districts: string[] | null
           created_at: string | null
+          department_id: string | null
           id: string
+          role: Database["public"]["Enums"]["admin_role"]
           user_id: string
         }
         Insert: {
+          assigned_areas?: string[] | null
+          assigned_districts?: string[] | null
           created_at?: string | null
+          department_id?: string | null
           id?: string
+          role?: Database["public"]["Enums"]["admin_role"]
           user_id: string
         }
         Update: {
+          assigned_areas?: string[] | null
+          assigned_districts?: string[] | null
           created_at?: string | null
+          department_id?: string | null
           id?: string
+          role?: Database["public"]["Enums"]["admin_role"]
           user_id?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "admins_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      category_department_mapping: {
+        Row: {
+          category: string
+          created_at: string
+          department_id: string
+          id: string
+        }
+        Insert: {
+          category: string
+          created_at?: string
+          department_id: string
+          id?: string
+        }
+        Update: {
+          category?: string
+          created_at?: string
+          department_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "category_department_mapping_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      departments: {
+        Row: {
+          code: Database["public"]["Enums"]["department_type"]
+          color: string | null
+          created_at: string
+          description: string | null
+          icon: string | null
+          id: string
+          name: string
+          sla_hours: number
+        }
+        Insert: {
+          code: Database["public"]["Enums"]["department_type"]
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name: string
+          sla_hours?: number
+        }
+        Update: {
+          code?: Database["public"]["Enums"]["department_type"]
+          color?: string | null
+          created_at?: string
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+          sla_hours?: number
+        }
         Relationships: []
+      }
+      escalation_history: {
+        Row: {
+          created_at: string
+          escalated_by: string | null
+          from_level: number
+          id: string
+          issue_id: string
+          reason: string
+          to_level: number
+        }
+        Insert: {
+          created_at?: string
+          escalated_by?: string | null
+          from_level: number
+          id?: string
+          issue_id: string
+          reason: string
+          to_level: number
+        }
+        Update: {
+          created_at?: string
+          escalated_by?: string | null
+          from_level?: number
+          id?: string
+          issue_id?: string
+          reason?: string
+          to_level?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "escalation_history_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       issues: {
         Row: {
@@ -38,12 +158,18 @@ export type Database = {
           area: string | null
           category: string
           created_at: string | null
+          department_id: string | null
           description: string
           district: string | null
+          escalated: boolean | null
+          escalated_at: string | null
+          escalation_level: number | null
           id: string
           latitude: number | null
           longitude: number | null
           photo_url: string | null
+          resolved_at: string | null
+          sla_deadline: string | null
           state: string | null
           status: string | null
           title: string
@@ -55,12 +181,18 @@ export type Database = {
           area?: string | null
           category: string
           created_at?: string | null
+          department_id?: string | null
           description: string
           district?: string | null
+          escalated?: boolean | null
+          escalated_at?: string | null
+          escalation_level?: number | null
           id?: string
           latitude?: number | null
           longitude?: number | null
           photo_url?: string | null
+          resolved_at?: string | null
+          sla_deadline?: string | null
           state?: string | null
           status?: string | null
           title: string
@@ -72,19 +204,33 @@ export type Database = {
           area?: string | null
           category?: string
           created_at?: string | null
+          department_id?: string | null
           description?: string
           district?: string | null
+          escalated?: boolean | null
+          escalated_at?: string | null
+          escalation_level?: number | null
           id?: string
           latitude?: number | null
           longitude?: number | null
           photo_url?: string | null
+          resolved_at?: string | null
+          sla_deadline?: string | null
           state?: string | null
           status?: string | null
           title?: string
           updated_at?: string | null
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "issues_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notifications: {
         Row: {
@@ -174,10 +320,24 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_can_access_issue: {
+        Args: { check_issue_id: string; check_user_id: string }
+        Returns: boolean
+      }
+      get_admin_department: { Args: { check_user_id: string }; Returns: string }
       is_admin: { Args: { check_user_id: string }; Returns: boolean }
+      is_super_admin: { Args: { check_user_id: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      admin_role: "super_admin" | "department_admin"
+      department_type:
+        | "roads"
+        | "sanitation"
+        | "electricity"
+        | "water"
+        | "traffic"
+        | "municipality"
+        | "other"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -304,6 +464,17 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      admin_role: ["super_admin", "department_admin"],
+      department_type: [
+        "roads",
+        "sanitation",
+        "electricity",
+        "water",
+        "traffic",
+        "municipality",
+        "other",
+      ],
+    },
   },
 } as const
