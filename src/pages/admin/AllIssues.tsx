@@ -7,11 +7,17 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { AlertCircle, CheckCircle2, Clock, MapPin, Search } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock, MapPin, Search, ArrowUpCircle } from 'lucide-react';
 import { toast } from 'sonner';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import IssueDetailsModal from '@/components/admin/IssueDetailsModal';
+import { SLABadge } from '@/components/admin/SLABadge';
+import { DepartmentBadge } from '@/components/admin/DepartmentBadge';
+import { EscalationBadge } from '@/components/admin/EscalationBadge';
+import { DepartmentFilter } from '@/components/admin/DepartmentFilter';
+import { useDepartments } from '@/hooks/useDepartments';
+import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { AdminRemarksSchema } from '@/lib/validation';
 
 interface Issue {
@@ -29,6 +35,11 @@ interface Issue {
   longitude: number | null;
   admin_remarks: string | null;
   user_id: string;
+  department_id: string | null;
+  sla_deadline: string | null;
+  escalated: boolean;
+  escalation_level: number;
+  resolved_at: string | null;
 }
 
 interface UserProfile {
@@ -43,13 +54,17 @@ export default function AllIssues() {
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<string>('all');
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
+  const [departmentFilter, setDepartmentFilter] = useState<string>('all');
+  const [escalationFilter, setEscalationFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [editingRemarks, setEditingRemarks] = useState<{ [key: string]: string }>({});
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
+  const { departments, getDepartmentById } = useDepartments();
+  const { adminInfo, isSuperAdmin, canAccessIssue } = useAdminAccess();
+
   useEffect(() => {
-    // AdminRoute handles auth check, just fetch data
     fetchIssues();
   }, []);
 
@@ -89,22 +104,14 @@ export default function AllIssues() {
   };
 
   useEffect(() => {
-    // Set up real-time subscription for automatic updates
     const channel = supabase
       .channel('admin-all-issues-changes')
       .on(
         'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'issues',
-        },
+        { event: '*', schema: 'public', table: 'issues' },
         (payload) => {
           console.log('Real-time update received:', payload);
-          // Fetch fresh data whenever any change occurs
           fetchIssues();
-          
-          // Show notification for new issues
           if (payload.eventType === 'INSERT') {
             toast.info('New issue reported!');
           }
@@ -126,7 +133,6 @@ export default function AllIssues() {
 
       if (error) throw error;
 
-      // Create notification for the user who reported the issue
       const statusMessages = {
         pending: 'Your issue is pending review',
         in_progress: 'Your issue is now being worked on',
@@ -149,7 +155,6 @@ export default function AllIssues() {
   };
 
   const updateRemarks = async (issueId: string, remarks: string) => {
-    // Validate remarks
     const validationResult = AdminRemarksSchema.safeParse(remarks);
     if (!validationResult.success) {
       toast.error(validationResult.error.errors[0].message);
@@ -175,6 +180,31 @@ export default function AllIssues() {
     }
   };
 
+  const reassignDepartment = async (issueId: string, departmentId: string) => {
+    try {
+      const dept = getDepartmentById(departmentId);
+      const slaDeadline = dept 
+        ? new Date(Date.now() + dept.sla_hours * 60 * 60 * 1000).toISOString()
+        : null;
+
+      const { error } = await supabase
+        .from('issues')
+        .update({ 
+          department_id: departmentId,
+          sla_deadline: slaDeadline,
+          escalated: false,
+          escalation_level: 0
+        })
+        .eq('id', issueId);
+
+      if (error) throw error;
+      toast.success('Department reassigned successfully!');
+      fetchIssues();
+    } catch (error) {
+      toast.error('Failed to reassign department');
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'pending':
@@ -196,9 +226,21 @@ export default function AllIssues() {
     setIsModalOpen(true);
   };
 
+  // Filter issues based on admin access and selected filters
   const filteredIssues = issues
+    .filter((i) => canAccessIssue(i))
     .filter((i) => filter === 'all' || i.status === filter)
     .filter((i) => categoryFilter === 'all' || i.category === categoryFilter)
+    .filter((i) => departmentFilter === 'all' || i.department_id === departmentFilter)
+    .filter((i) => {
+      if (escalationFilter === 'all') return true;
+      if (escalationFilter === 'escalated') return i.escalated;
+      if (escalationFilter === 'overdue') {
+        if (!i.sla_deadline || i.status === 'resolved') return false;
+        return new Date(i.sla_deadline) < new Date();
+      }
+      return true;
+    })
     .filter((i) => 
       searchQuery === '' || 
       i.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -206,6 +248,12 @@ export default function AllIssues() {
     );
 
   const uniqueCategories = Array.from(new Set(issues.map((i) => i.category)));
+  const overdueCount = issues.filter(i => 
+    i.sla_deadline && 
+    i.status !== 'resolved' && 
+    new Date(i.sla_deadline) < new Date()
+  ).length;
+  const escalatedCount = issues.filter(i => i.escalated).length;
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -217,7 +265,22 @@ export default function AllIssues() {
         <main className="flex-1 p-6 overflow-auto">
           <div className="space-y-6">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-              <h1 className="text-3xl font-bold">All Issues</h1>
+              <div>
+                <h1 className="text-3xl font-bold">All Issues</h1>
+                <div className="flex gap-2 mt-2">
+                  {overdueCount > 0 && (
+                    <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">
+                      {overdueCount} Overdue
+                    </Badge>
+                  )}
+                  {escalatedCount > 0 && (
+                    <Badge variant="outline" className="bg-warning/10 text-warning border-warning/20">
+                      <ArrowUpCircle className="h-3 w-3 mr-1" />
+                      {escalatedCount} Escalated
+                    </Badge>
+                  )}
+                </div>
+              </div>
               
               <div className="flex flex-wrap gap-3 w-full md:w-auto">
                 <div className="relative flex-1 md:flex-initial md:w-64">
@@ -231,7 +294,7 @@ export default function AllIssues() {
                 </div>
                 
                 <Select value={filter} onValueChange={setFilter}>
-                  <SelectTrigger className="w-[160px]">
+                  <SelectTrigger className="w-[140px]">
                     <SelectValue placeholder="Status" />
                   </SelectTrigger>
                   <SelectContent>
@@ -243,7 +306,7 @@ export default function AllIssues() {
                 </Select>
                 
                 <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-                  <SelectTrigger className="w-[160px]">
+                  <SelectTrigger className="w-[140px]">
                     <SelectValue placeholder="Category" />
                   </SelectTrigger>
                   <SelectContent>
@@ -253,6 +316,26 @@ export default function AllIssues() {
                         {category}
                       </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+
+                {isSuperAdmin && (
+                  <DepartmentFilter
+                    departments={departments}
+                    value={departmentFilter}
+                    onChange={setDepartmentFilter}
+                    className="w-[160px]"
+                  />
+                )}
+
+                <Select value={escalationFilter} onValueChange={setEscalationFilter}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Priority" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Priority</SelectItem>
+                    <SelectItem value="escalated">Escalated</SelectItem>
+                    <SelectItem value="overdue">Overdue</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -270,169 +353,188 @@ export default function AllIssues() {
               </Card>
             ) : (
               <div className="grid gap-4">
-                {filteredIssues.map((issue) => (
-                  <Card key={issue.id} className="shadow-soft hover:shadow-medium transition-all">
-                    <CardContent className="p-6">
-                      <div className="flex flex-col lg:flex-row gap-6">
-                        {issue.photo_url && (
-                          <div className="lg:w-64 flex-shrink-0">
-                            <img 
-                              src={issue.photo_url} 
-                              alt={issue.title}
-                              className="rounded-lg w-full h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                              onClick={() => handleViewDetails(issue)}
-                            />
-                          </div>
-                        )}
-
-                        <div className="flex-1 space-y-4">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h3 className="text-lg font-semibold mb-1">{issue.title}</h3>
-                              <p className="text-sm text-muted-foreground">{issue.category}</p>
-                              <p className="text-sm text-muted-foreground">
-                                Reported by: {userProfiles[issue.user_id]?.full_name || 'Unknown'} ({userProfiles[issue.user_id]?.email || 'N/A'})
-                              </p>
+                {filteredIssues.map((issue) => {
+                  const department = getDepartmentById(issue.department_id || '');
+                  
+                  return (
+                    <Card 
+                      key={issue.id} 
+                      className={`shadow-soft hover:shadow-medium transition-all ${
+                        issue.escalated ? 'border-l-4 border-l-warning' : ''
+                      }`}
+                    >
+                      <CardContent className="p-6">
+                        <div className="flex flex-col lg:flex-row gap-6">
+                          {issue.photo_url && (
+                            <div className="lg:w-64 flex-shrink-0">
+                              <img 
+                                src={issue.photo_url} 
+                                alt={issue.title}
+                                className="rounded-lg w-full h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                onClick={() => handleViewDetails(issue)}
+                              />
                             </div>
-                            {getStatusBadge(issue.status)}
-                          </div>
+                          )}
 
-                          <p className="text-sm line-clamp-2">{issue.description}</p>
+                          <div className="flex-1 space-y-4">
+                            <div className="flex flex-wrap justify-between items-start gap-2">
+                              <div className="space-y-1">
+                                <h3 className="text-lg font-semibold">{issue.title}</h3>
+                                <p className="text-sm text-muted-foreground">{issue.category}</p>
+                                <p className="text-sm text-muted-foreground">
+                                  Reported by: {userProfiles[issue.user_id]?.full_name || 'Unknown'}
+                                </p>
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                {getStatusBadge(issue.status)}
+                                <DepartmentBadge department={department || null} />
+                                <SLABadge 
+                                  slaDeadline={issue.sla_deadline} 
+                                  status={issue.status}
+                                  resolvedAt={issue.resolved_at}
+                                />
+                                <EscalationBadge 
+                                  escalated={issue.escalated} 
+                                  escalationLevel={issue.escalation_level} 
+                                />
+                              </div>
+                            </div>
 
-                          <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                            <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                            <div>
+                            <p className="text-sm line-clamp-2">{issue.description}</p>
+
+                            <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                              <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
                               <p className="font-medium">
                                 {issue.area && issue.district && issue.state
                                   ? `${issue.area}, ${issue.district}, ${issue.state}`
                                   : 'Location not specified'}
                               </p>
-                              {issue.latitude !== null && issue.longitude !== null && (
-                                <div className="space-y-2">
-                                  <a
-                                    href={`https://www.google.com/maps?q=${issue.latitude},${issue.longitude}`}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className="text-xs text-primary hover:underline"
-                                  >
-                                    View on Map →
-                                  </a>
+                            </div>
 
-                                  {/* Small embedded map preview */}
-                                  <div className="mt-2 rounded-md overflow-hidden border hidden md:block">
-                                    <iframe
-                                      title={`map-preview-${issue.id}`}
-                                      src={`https://www.openstreetmap.org/export/embed.html?bbox=${issue.longitude - 0.01}%2C${issue.latitude - 0.01}%2C${issue.longitude + 0.01}%2C${issue.latitude + 0.01}&layer=mapnik&marker=${issue.latitude}%2C${issue.longitude}`}
-                                      style={{ width: '100%', height: '160px', border: 0 }}
-                                    />
-                                    <div className="p-2 text-xs text-muted-foreground">Preview. Click to open in OpenStreetMap.</div>
+                            {/* Department Reassignment (Super Admin only) */}
+                            {isSuperAdmin && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm text-muted-foreground">Assign to:</span>
+                                <Select 
+                                  value={issue.department_id || ''} 
+                                  onValueChange={(val) => reassignDepartment(issue.id, val)}
+                                >
+                                  <SelectTrigger className="w-[200px]">
+                                    <SelectValue placeholder="Select department" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {departments.map((dept) => (
+                                      <SelectItem key={dept.id} value={dept.id}>
+                                        {dept.name}
+                                      </SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            )}
+
+                            <div className="space-y-2">
+                              <label className="text-sm font-medium">Admin Remarks</label>
+                              {editingRemarks[issue.id] !== undefined ? (
+                                <div className="space-y-2">
+                                  <Textarea
+                                    value={editingRemarks[issue.id]}
+                                    onChange={(e) =>
+                                      setEditingRemarks((prev) => ({
+                                        ...prev,
+                                        [issue.id]: e.target.value,
+                                      }))
+                                    }
+                                    placeholder="Add remarks for the user..."
+                                    className="min-h-[80px]"
+                                  />
+                                  <div className="flex gap-2">
+                                    <Button
+                                      size="sm"
+                                      onClick={() => updateRemarks(issue.id, editingRemarks[issue.id])}
+                                    >
+                                      Save Remarks
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() =>
+                                        setEditingRemarks((prev) => {
+                                          const updated = { ...prev };
+                                          delete updated[issue.id];
+                                          return updated;
+                                        })
+                                      }
+                                    >
+                                      Cancel
+                                    </Button>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div>
+                                  <p className="text-sm text-muted-foreground mb-2">
+                                    {issue.admin_remarks || 'No remarks yet'}
+                                  </p>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={() =>
+                                        setEditingRemarks((prev) => ({
+                                          ...prev,
+                                          [issue.id]: issue.admin_remarks || '',
+                                        }))
+                                      }
+                                    >
+                                      {issue.admin_remarks ? 'Edit Remarks' : 'Add Remarks'}
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="secondary"
+                                      onClick={() => handleViewDetails(issue)}
+                                    >
+                                      View Details
+                                    </Button>
                                   </div>
                                 </div>
                               )}
                             </div>
-                          </div>
 
-                          <div className="space-y-2">
-                            <label className="text-sm font-medium">Admin Remarks</label>
-                            {editingRemarks[issue.id] !== undefined ? (
-                              <div className="space-y-2">
-                                <Textarea
-                                  value={editingRemarks[issue.id]}
-                                  onChange={(e) =>
-                                    setEditingRemarks((prev) => ({
-                                      ...prev,
-                                      [issue.id]: e.target.value,
-                                    }))
-                                  }
-                                  placeholder="Add remarks for the user..."
-                                  className="min-h-[80px]"
-                                />
-                                <div className="flex gap-2">
-                                  <Button
-                                    size="sm"
-                                    onClick={() => updateRemarks(issue.id, editingRemarks[issue.id])}
-                                  >
-                                    Save Remarks
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() =>
-                                      setEditingRemarks((prev) => {
-                                        const updated = { ...prev };
-                                        delete updated[issue.id];
-                                        return updated;
-                                      })
-                                    }
-                                  >
-                                    Cancel
-                                  </Button>
-                                </div>
-                              </div>
-                            ) : (
-                              <div>
-                                <p className="text-sm text-muted-foreground mb-2">
-                                  {issue.admin_remarks || 'No remarks yet'}
-                                </p>
-                                <div className="flex gap-2">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    onClick={() =>
-                                      setEditingRemarks((prev) => ({
-                                        ...prev,
-                                        [issue.id]: issue.admin_remarks || '',
-                                      }))
-                                    }
-                                  >
-                                    {issue.admin_remarks ? 'Edit Remarks' : 'Add Remarks'}
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="secondary"
-                                    onClick={() => handleViewDetails(issue)}
-                                  >
-                                    View Details
-                                  </Button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-
-                          <div className="flex flex-wrap gap-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm"
-                              onClick={() => updateStatus(issue.id, 'pending', issue.user_id)}
-                              disabled={issue.status === 'pending'}
-                              className="bg-warning/10 hover:bg-warning/20 text-warning border-warning/20"
-                            >
-                              Mark Pending
-                            </Button>
-                            <Button 
-                              variant="outline"
-                              size="sm"
-                              onClick={() => updateStatus(issue.id, 'in_progress', issue.user_id)}
-                              disabled={issue.status === 'in_progress'}
-                              className="bg-primary/10 hover:bg-primary/20 text-primary border-primary/20"
-                            >
-                              Mark In Progress
-                            </Button>
-                            <Button 
-                              variant="outline"
-                              size="sm"
-                              onClick={() => updateStatus(issue.id, 'resolved', issue.user_id)}
-                              disabled={issue.status === 'resolved'}
-                              className="bg-success/10 hover:bg-success/20 text-success border-success/20"
-                            >
-                              Mark Resolved
-                            </Button>
+                            <div className="flex flex-wrap gap-2">
+                              <Button 
+                                variant="outline" 
+                                size="sm"
+                                onClick={() => updateStatus(issue.id, 'pending', issue.user_id)}
+                                disabled={issue.status === 'pending'}
+                                className="bg-warning/10 hover:bg-warning/20 text-warning border-warning/20"
+                              >
+                                Mark Pending
+                              </Button>
+                              <Button 
+                                variant="outline"
+                                size="sm"
+                                onClick={() => updateStatus(issue.id, 'in_progress', issue.user_id)}
+                                disabled={issue.status === 'in_progress'}
+                                className="bg-primary/10 hover:bg-primary/20 text-primary border-primary/20"
+                              >
+                                Mark In Progress
+                              </Button>
+                              <Button 
+                                variant="outline"
+                                size="sm"
+                                onClick={() => updateStatus(issue.id, 'resolved', issue.user_id)}
+                                disabled={issue.status === 'resolved'}
+                                className="bg-success/10 hover:bg-success/20 text-success border-success/20"
+                              >
+                                Mark Resolved
+                              </Button>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             )}
           </div>

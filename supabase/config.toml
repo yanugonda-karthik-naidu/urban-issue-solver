@@ -2,3 +2,9 @@ project_id = "cdkvkewrwwxatiayykln"
 
 [functions.civic-guide-chat]
 verify_jwt = false
+
+[functions.check-escalations]
+verify_jwt = false
+
+[functions.create-admin-notifications]
+verify_jwt = true
