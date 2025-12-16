@@ -11,7 +11,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Shield, ShieldCheck, UserPlus, Trash2, Building2 } from 'lucide-react';
+import { Shield, ShieldCheck, UserPlus, Trash2, Building2, Clock, Check, X } from 'lucide-react';
 import { useDepartments } from '@/hooks/useDepartments';
 import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { DepartmentBadge } from '@/components/admin/DepartmentBadge';
@@ -39,8 +39,10 @@ export default function ManageAdmins() {
   const [newAdminDepartment, setNewAdminDepartment] = useState('');
   const [newAdminDistricts, setNewAdminDistricts] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [editingSlaId, setEditingSlaId] = useState<string | null>(null);
+  const [editingSlaValue, setEditingSlaValue] = useState<number>(0);
 
-  const { departments, getDepartmentById } = useDepartments();
+  const { departments, getDepartmentById, refetch: refetchDepartments } = useDepartments();
   const { isSuperAdmin } = useAdminAccess();
 
   useEffect(() => {
@@ -190,6 +192,26 @@ export default function ManageAdmins() {
       fetchAdmins();
     } catch (error) {
       toast.error('Failed to remove admin');
+    }
+  };
+
+  const updateSlaHours = async (deptId: string, hours: number) => {
+    if (hours < 1 || hours > 720) {
+      toast.error('SLA hours must be between 1 and 720');
+      return;
+    }
+    try {
+      const { error } = await supabase
+        .from('departments')
+        .update({ sla_hours: hours })
+        .eq('id', deptId);
+
+      if (error) throw error;
+      toast.success('SLA hours updated!');
+      refetchDepartments();
+      setEditingSlaId(null);
+    } catch (error) {
+      toast.error('Failed to update SLA hours');
     }
   };
 
@@ -479,9 +501,47 @@ export default function ManageAdmins() {
                             {dept.description}
                           </TableCell>
                           <TableCell>
-                            <Badge variant="outline">
-                              {dept.sla_hours}h
-                            </Badge>
+                            {editingSlaId === dept.id ? (
+                              <div className="flex items-center gap-2">
+                                <Input
+                                  type="number"
+                                  min={1}
+                                  max={720}
+                                  value={editingSlaValue}
+                                  onChange={(e) => setEditingSlaValue(parseInt(e.target.value) || 0)}
+                                  className="w-20 h-8"
+                                />
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 text-green-600"
+                                  onClick={() => updateSlaHours(dept.id, editingSlaValue)}
+                                >
+                                  <Check className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="ghost"
+                                  className="h-8 w-8 p-0 text-destructive"
+                                  onClick={() => setEditingSlaId(null)}
+                                >
+                                  <X className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="gap-1"
+                                onClick={() => {
+                                  setEditingSlaId(dept.id);
+                                  setEditingSlaValue(dept.sla_hours);
+                                }}
+                              >
+                                <Clock className="h-3 w-3" />
+                                {dept.sla_hours}h
+                              </Button>
+                            )}
                           </TableCell>
                           <TableCell>
                             <Badge variant="outline">
