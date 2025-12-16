@@ -5,10 +5,10 @@ import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
-import IssueHeatmap from '@/components/IssueHeatmap';
+import { IssueHeatmap } from '@/components/IssueHeatmap';
 import { DepartmentPerformance } from '@/components/admin/DepartmentPerformance';
 import { useDepartments } from '@/hooks/useDepartments';
-import { TrendingUp, Building2 } from 'lucide-react';
+import { TrendingUp, Building2, MapPin, Brain } from 'lucide-react';
 
 interface CategoryData {
   name: string;
@@ -35,7 +35,6 @@ interface Issue {
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
 
 export default function Analytics() {
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
   const [allIssues, setAllIssues] = useState<Issue[]>([]);
   const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
