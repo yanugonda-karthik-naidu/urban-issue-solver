@@ -1,12 +1,12 @@
-import { useState } from 'react';
-import { LayoutDashboard, FileText, Users, BarChart3, Settings, LogOut } from 'lucide-react';
-import { NavLink } from 'react-router-dom';
+import { useState, useEffect } from 'react';
+import { LayoutDashboard, FileText, Users, BarChart3, Settings, LogOut, Building2, UserCog } from 'lucide-react';
+import { NavLink, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
+import { useAdminAccess } from '@/hooks/useAdminAccess';
 
-const menuItems = [
+const superAdminMenuItems = [
   { title: 'Dashboard', url: '/admin', icon: LayoutDashboard },
   { title: 'All Issues', url: '/admin/issues', icon: FileText },
   { title: 'Analytics', url: '/admin/analytics', icon: BarChart3 },
@@ -14,9 +14,21 @@ const menuItems = [
   { title: 'Settings', url: '/admin/settings', icon: Settings },
 ];
 
+const departmentAdminMenuItems = [
+  { title: 'Dashboard', url: '/department', icon: Building2 },
+  { title: 'Issues', url: '/department/issues', icon: FileText },
+  { title: 'Workers', url: '/department/workers', icon: UserCog },
+  { title: 'Analytics', url: '/department/analytics', icon: BarChart3 },
+  { title: 'Settings', url: '/admin/settings', icon: Settings },
+];
+
 export default function AdminSidebar() {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
+  const { isSuperAdmin, loading } = useAdminAccess();
+
+  const menuItems = isSuperAdmin ? superAdminMenuItems : departmentAdminMenuItems;
+  const title = isSuperAdmin ? 'Admin Control Center' : 'Department Control Center';
 
   const handleLogout = async () => {
     try {
@@ -36,13 +48,14 @@ export default function AdminSidebar() {
       collapsed ? 'w-16' : 'w-64'
     )}>
       <div className="p-4 border-b border-border flex items-center justify-between">
-        <h2 className={cn('text-sm font-bold text-primary transition-all', collapsed ? 'hidden' : 'text-xl')}>Admin Control Center</h2>
+        <h2 className={cn('text-sm font-bold text-primary transition-all', collapsed ? 'hidden' : 'text-lg')}>
+          {title}
+        </h2>
         <button
           aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           onClick={() => setCollapsed(s => !s)}
           className="p-2 rounded-md hover:bg-muted"
         >
-          {/* simple hamburger / chevron */}
           <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor">
             {collapsed ? (
               <path strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" d="M6 9l6 6 6-6" />
@@ -57,12 +70,12 @@ export default function AdminSidebar() {
         </button>
       </div>
 
-      <nav className={cn('flex-1 p-2 space-y-1', collapsed ? 'px-1' : 'p-4') }>
+      <nav className={cn('flex-1 p-2 space-y-1', collapsed ? 'px-1' : 'p-4')}>
         {menuItems.map((item) => (
           <NavLink
             key={item.url}
             to={item.url}
-            end={item.url === '/admin'}
+            end={item.url === '/admin' || item.url === '/department'}
             className={({ isActive }) => cn(
               'flex items-center gap-3 rounded-lg transition-colors',
               collapsed ? 'px-2 py-3 justify-center' : 'px-4 py-3',
@@ -74,6 +87,7 @@ export default function AdminSidebar() {
           </NavLink>
         ))}
       </nav>
+
       <div className={cn('p-3 border-t border-border flex items-center', collapsed ? 'justify-center' : '')}>
         <button
           onClick={handleLogout}

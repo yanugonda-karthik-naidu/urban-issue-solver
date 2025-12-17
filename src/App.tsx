@@ -21,6 +21,12 @@ import Analytics from "./pages/admin/Analytics";
 import ManageAdmins from "./pages/admin/ManageAdmins";
 import Settings from "./pages/admin/Settings";
 
+// Department Pages
+import DepartmentDashboard from "./pages/department/DepartmentDashboard";
+import DepartmentIssues from "./pages/department/DepartmentIssues";
+import DepartmentWorkers from "./pages/department/DepartmentWorkers";
+import DepartmentAnalytics from "./pages/department/DepartmentAnalytics";
+
 // Other
 import NotFound from "./pages/NotFound";
 
@@ -41,8 +47,8 @@ const App = () => (
         {(() => {
           function ChatbotVisibility() {
             const location = useLocation();
-            // hide on admin routes
-            if (location.pathname.startsWith('/admin')) return null;
+            // hide on admin and department routes
+            if (location.pathname.startsWith('/admin') || location.pathname.startsWith('/department')) return null;
             return <FloatingChatbot />;
           }
 
@@ -68,6 +74,12 @@ const App = () => (
           <Route path="/admin/analytics" element={<AdminRoute><Analytics /></AdminRoute>} />
           <Route path="/admin/manage-admins" element={<AdminRoute><ManageAdmins /></AdminRoute>} />
           <Route path="/admin/settings" element={<AdminRoute><Settings /></AdminRoute>} />
+
+          {/* 🏢 Department Routes - Protected with AdminRoute guard */}
+          <Route path="/department" element={<AdminRoute><DepartmentDashboard /></AdminRoute>} />
+          <Route path="/department/issues" element={<AdminRoute><DepartmentIssues /></AdminRoute>} />
+          <Route path="/department/workers" element={<AdminRoute><DepartmentWorkers /></AdminRoute>} />
+          <Route path="/department/analytics" element={<AdminRoute><DepartmentAnalytics /></AdminRoute>} />
 
           {/* 🚫 404 Route */}
           <Route path="*" element={<><Header /><NotFound /></>} />

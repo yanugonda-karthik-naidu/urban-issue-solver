@@ -156,6 +156,7 @@ export type Database = {
         Row: {
           admin_remarks: string | null
           area: string | null
+          assigned_worker_id: string | null
           category: string
           created_at: string | null
           department_id: string | null
@@ -179,6 +180,7 @@ export type Database = {
         Insert: {
           admin_remarks?: string | null
           area?: string | null
+          assigned_worker_id?: string | null
           category: string
           created_at?: string | null
           department_id?: string | null
@@ -202,6 +204,7 @@ export type Database = {
         Update: {
           admin_remarks?: string | null
           area?: string | null
+          assigned_worker_id?: string | null
           category?: string
           created_at?: string | null
           department_id?: string | null
@@ -223,6 +226,13 @@ export type Database = {
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "issues_assigned_worker_id_fkey"
+            columns: ["assigned_worker_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "issues_department_id_fkey"
             columns: ["department_id"]
@@ -314,6 +324,47 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      workers: {
+        Row: {
+          assigned_area: string | null
+          assigned_district: string | null
+          created_at: string
+          created_by: string | null
+          department_id: string | null
+          id: string
+          name: string
+          phone: string | null
+        }
+        Insert: {
+          assigned_area?: string | null
+          assigned_district?: string | null
+          created_at?: string
+          created_by?: string | null
+          department_id?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+        }
+        Update: {
+          assigned_area?: string | null
+          assigned_district?: string | null
+          created_at?: string
+          created_by?: string | null
+          department_id?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "workers_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
