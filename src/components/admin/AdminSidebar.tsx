@@ -9,6 +9,7 @@ import { useAdminAccess } from '@/hooks/useAdminAccess';
 const superAdminMenuItems = [
   { title: 'Dashboard', url: '/admin', icon: LayoutDashboard },
   { title: 'All Issues', url: '/admin/issues', icon: FileText },
+  { title: 'Workers', url: '/admin/workers', icon: UserCog },
   { title: 'Analytics', url: '/admin/analytics', icon: BarChart3 },
   { title: 'Manage Admins', url: '/admin/manage-admins', icon: Users },
   { title: 'Settings', url: '/admin/settings', icon: Settings },

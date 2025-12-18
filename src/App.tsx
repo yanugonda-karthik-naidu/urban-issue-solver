@@ -19,6 +19,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AllIssues from "./pages/admin/AllIssues";
 import Analytics from "./pages/admin/Analytics";
 import ManageAdmins from "./pages/admin/ManageAdmins";
+import ManageWorkers from "./pages/admin/ManageWorkers";
 import Settings from "./pages/admin/Settings";
 
 // Department Pages
@@ -71,6 +72,7 @@ const App = () => (
           {/* 🧑‍💼 Admin Routes - Protected with AdminRoute guard */}
           <Route path="/admin" element={<AdminRoute><AdminDashboard /></AdminRoute>} />
           <Route path="/admin/issues" element={<AdminRoute><AllIssues /></AdminRoute>} />
+          <Route path="/admin/workers" element={<AdminRoute><ManageWorkers /></AdminRoute>} />
           <Route path="/admin/analytics" element={<AdminRoute><Analytics /></AdminRoute>} />
           <Route path="/admin/manage-admins" element={<AdminRoute><ManageAdmins /></AdminRoute>} />
           <Route path="/admin/settings" element={<AdminRoute><Settings /></AdminRoute>} />
