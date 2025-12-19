@@ -7,11 +7,13 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { AlertCircle, CheckCircle2, Clock, MapPin, Search, ArrowUpCircle } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AlertCircle, CheckCircle2, Clock, MapPin, Search, ArrowUpCircle, List, Map } from 'lucide-react';
 import { toast } from 'sonner';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import IssueDetailsModal from '@/components/admin/IssueDetailsModal';
+import IssuesMap from '@/components/admin/IssuesMap';
 import { SLABadge } from '@/components/admin/SLABadge';
 import { DepartmentBadge } from '@/components/admin/DepartmentBadge';
 import { EscalationBadge } from '@/components/admin/EscalationBadge';
@@ -341,202 +343,229 @@ export default function AllIssues() {
               </div>
             </div>
 
-            {loading ? (
-              <div className="flex items-center justify-center h-64">
-                <p className="text-muted-foreground">Loading issues...</p>
-              </div>
-            ) : filteredIssues.length === 0 ? (
-              <Card className="shadow-medium">
-                <CardContent className="py-12 text-center">
-                  <p className="text-muted-foreground">No issues found</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid gap-4">
-                {filteredIssues.map((issue) => {
-                  const department = getDepartmentById(issue.department_id || '');
-                  
-                  return (
-                    <Card 
-                      key={issue.id} 
-                      className={`shadow-soft hover:shadow-medium transition-all ${
-                        issue.escalated ? 'border-l-4 border-l-warning' : ''
-                      }`}
-                    >
-                      <CardContent className="p-6">
-                        <div className="flex flex-col lg:flex-row gap-6">
-                          {issue.photo_url && (
-                            <div className="lg:w-64 flex-shrink-0">
-                              <img 
-                                src={issue.photo_url} 
-                                alt={issue.title}
-                                className="rounded-lg w-full h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                                onClick={() => handleViewDetails(issue)}
-                              />
-                            </div>
-                          )}
+            <Tabs defaultValue="list" className="w-full">
+              <TabsList className="mb-4">
+                <TabsTrigger value="list" className="flex items-center gap-2">
+                  <List className="h-4 w-4" />
+                  List View
+                </TabsTrigger>
+                <TabsTrigger value="map" className="flex items-center gap-2">
+                  <Map className="h-4 w-4" />
+                  Map View
+                </TabsTrigger>
+              </TabsList>
 
-                          <div className="flex-1 space-y-4">
-                            <div className="flex flex-wrap justify-between items-start gap-2">
-                              <div className="space-y-1">
-                                <h3 className="text-lg font-semibold">{issue.title}</h3>
-                                <p className="text-sm text-muted-foreground">{issue.category}</p>
-                                <p className="text-sm text-muted-foreground">
-                                  Reported by: {userProfiles[issue.user_id]?.full_name || 'Unknown'}
-                                </p>
-                              </div>
-                              <div className="flex flex-wrap gap-2">
-                                {getStatusBadge(issue.status)}
-                                <DepartmentBadge department={department || null} />
-                                <SLABadge 
-                                  slaDeadline={issue.sla_deadline} 
-                                  status={issue.status}
-                                  resolvedAt={issue.resolved_at}
-                                />
-                                <EscalationBadge 
-                                  escalated={issue.escalated} 
-                                  escalationLevel={issue.escalation_level} 
-                                />
-                              </div>
-                            </div>
+              <TabsContent value="map">
+                <Card className="shadow-soft">
+                  <CardContent className="p-4 relative">
+                    <IssuesMap 
+                      issues={filteredIssues} 
+                      height="600px" 
+                      onIssueClick={(issue) => handleViewDetails(issue as Issue)}
+                    />
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-                            <p className="text-sm line-clamp-2">{issue.description}</p>
-
-                            <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                              <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                              <p className="font-medium">
-                                {issue.area && issue.district && issue.state
-                                  ? `${issue.area}, ${issue.district}, ${issue.state}`
-                                  : 'Location not specified'}
-                              </p>
-                            </div>
-
-                            {/* Department Reassignment (Super Admin only) */}
-                            {isSuperAdmin && (
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm text-muted-foreground">Assign to:</span>
-                                <Select 
-                                  value={issue.department_id || ''} 
-                                  onValueChange={(val) => reassignDepartment(issue.id, val)}
-                                >
-                                  <SelectTrigger className="w-[200px]">
-                                    <SelectValue placeholder="Select department" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {departments.map((dept) => (
-                                      <SelectItem key={dept.id} value={dept.id}>
-                                        {dept.name}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            )}
-
-                            <div className="space-y-2">
-                              <label className="text-sm font-medium">Admin Remarks</label>
-                              {editingRemarks[issue.id] !== undefined ? (
-                                <div className="space-y-2">
-                                  <Textarea
-                                    value={editingRemarks[issue.id]}
-                                    onChange={(e) =>
-                                      setEditingRemarks((prev) => ({
-                                        ...prev,
-                                        [issue.id]: e.target.value,
-                                      }))
-                                    }
-                                    placeholder="Add remarks for the user..."
-                                    className="min-h-[80px]"
+              <TabsContent value="list">
+                {loading ? (
+                  <div className="flex items-center justify-center h-64">
+                    <p className="text-muted-foreground">Loading issues...</p>
+                  </div>
+                ) : filteredIssues.length === 0 ? (
+                  <Card className="shadow-medium">
+                    <CardContent className="py-12 text-center">
+                      <p className="text-muted-foreground">No issues found</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid gap-4">
+                    {filteredIssues.map((issue) => {
+                      const department = getDepartmentById(issue.department_id || '');
+                      
+                      return (
+                        <Card 
+                          key={issue.id} 
+                          className={`shadow-soft hover:shadow-medium transition-all ${
+                            issue.escalated ? 'border-l-4 border-l-warning' : ''
+                          }`}
+                        >
+                          <CardContent className="p-6">
+                            <div className="flex flex-col lg:flex-row gap-6">
+                              {issue.photo_url && (
+                                <div className="lg:w-64 flex-shrink-0">
+                                  <img 
+                                    src={issue.photo_url} 
+                                    alt={issue.title}
+                                    className="rounded-lg w-full h-48 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                    onClick={() => handleViewDetails(issue)}
                                   />
-                                  <div className="flex gap-2">
-                                    <Button
-                                      size="sm"
-                                      onClick={() => updateRemarks(issue.id, editingRemarks[issue.id])}
-                                    >
-                                      Save Remarks
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() =>
-                                        setEditingRemarks((prev) => {
-                                          const updated = { ...prev };
-                                          delete updated[issue.id];
-                                          return updated;
-                                        })
-                                      }
-                                    >
-                                      Cancel
-                                    </Button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div>
-                                  <p className="text-sm text-muted-foreground mb-2">
-                                    {issue.admin_remarks || 'No remarks yet'}
-                                  </p>
-                                  <div className="flex gap-2">
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      onClick={() =>
-                                        setEditingRemarks((prev) => ({
-                                          ...prev,
-                                          [issue.id]: issue.admin_remarks || '',
-                                        }))
-                                      }
-                                    >
-                                      {issue.admin_remarks ? 'Edit Remarks' : 'Add Remarks'}
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="secondary"
-                                      onClick={() => handleViewDetails(issue)}
-                                    >
-                                      View Details
-                                    </Button>
-                                  </div>
                                 </div>
                               )}
-                            </div>
 
-                            <div className="flex flex-wrap gap-2">
-                              <Button 
-                                variant="outline" 
-                                size="sm"
-                                onClick={() => updateStatus(issue.id, 'pending', issue.user_id)}
-                                disabled={issue.status === 'pending'}
-                                className="bg-warning/10 hover:bg-warning/20 text-warning border-warning/20"
-                              >
-                                Mark Pending
-                              </Button>
-                              <Button 
-                                variant="outline"
-                                size="sm"
-                                onClick={() => updateStatus(issue.id, 'in_progress', issue.user_id)}
-                                disabled={issue.status === 'in_progress'}
-                                className="bg-primary/10 hover:bg-primary/20 text-primary border-primary/20"
-                              >
-                                Mark In Progress
-                              </Button>
-                              <Button 
-                                variant="outline"
-                                size="sm"
-                                onClick={() => updateStatus(issue.id, 'resolved', issue.user_id)}
-                                disabled={issue.status === 'resolved'}
-                                className="bg-success/10 hover:bg-success/20 text-success border-success/20"
-                              >
-                                Mark Resolved
-                              </Button>
+                              <div className="flex-1 space-y-4">
+                                <div className="flex flex-wrap justify-between items-start gap-2">
+                                  <div className="space-y-1">
+                                    <h3 className="text-lg font-semibold">{issue.title}</h3>
+                                    <p className="text-sm text-muted-foreground">{issue.category}</p>
+                                    <p className="text-sm text-muted-foreground">
+                                      Reported by: {userProfiles[issue.user_id]?.full_name || 'Unknown'}
+                                    </p>
+                                  </div>
+                                  <div className="flex flex-wrap gap-2">
+                                    {getStatusBadge(issue.status)}
+                                    <DepartmentBadge department={department || null} />
+                                    <SLABadge 
+                                      slaDeadline={issue.sla_deadline} 
+                                      status={issue.status}
+                                      resolvedAt={issue.resolved_at}
+                                    />
+                                    <EscalationBadge 
+                                      escalated={issue.escalated} 
+                                      escalationLevel={issue.escalation_level} 
+                                    />
+                                  </div>
+                                </div>
+
+                                <p className="text-sm line-clamp-2">{issue.description}</p>
+
+                                <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                                  <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                                  <p className="font-medium">
+                                    {issue.area && issue.district && issue.state
+                                      ? `${issue.area}, ${issue.district}, ${issue.state}`
+                                      : 'Location not specified'}
+                                  </p>
+                                </div>
+
+                                {/* Department Reassignment (Super Admin only) */}
+                                {isSuperAdmin && (
+                                  <div className="flex items-center gap-2">
+                                    <span className="text-sm text-muted-foreground">Assign to:</span>
+                                    <Select 
+                                      value={issue.department_id || ''} 
+                                      onValueChange={(val) => reassignDepartment(issue.id, val)}
+                                    >
+                                      <SelectTrigger className="w-[200px]">
+                                        <SelectValue placeholder="Select department" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        {departments.map((dept) => (
+                                          <SelectItem key={dept.id} value={dept.id}>
+                                            {dept.name}
+                                          </SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                )}
+
+                                <div className="space-y-2">
+                                  <label className="text-sm font-medium">Admin Remarks</label>
+                                  {editingRemarks[issue.id] !== undefined ? (
+                                    <div className="space-y-2">
+                                      <Textarea
+                                        value={editingRemarks[issue.id]}
+                                        onChange={(e) =>
+                                          setEditingRemarks((prev) => ({
+                                            ...prev,
+                                            [issue.id]: e.target.value,
+                                          }))
+                                        }
+                                        placeholder="Add remarks for the user..."
+                                        className="min-h-[80px]"
+                                      />
+                                      <div className="flex gap-2">
+                                        <Button
+                                          size="sm"
+                                          onClick={() => updateRemarks(issue.id, editingRemarks[issue.id])}
+                                        >
+                                          Save Remarks
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() =>
+                                            setEditingRemarks((prev) => {
+                                              const updated = { ...prev };
+                                              delete updated[issue.id];
+                                              return updated;
+                                            })
+                                          }
+                                        >
+                                          Cancel
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  ) : (
+                                    <div>
+                                      <p className="text-sm text-muted-foreground mb-2">
+                                        {issue.admin_remarks || 'No remarks yet'}
+                                      </p>
+                                      <div className="flex gap-2">
+                                        <Button
+                                          size="sm"
+                                          variant="outline"
+                                          onClick={() =>
+                                            setEditingRemarks((prev) => ({
+                                              ...prev,
+                                              [issue.id]: issue.admin_remarks || '',
+                                            }))
+                                          }
+                                        >
+                                          {issue.admin_remarks ? 'Edit Remarks' : 'Add Remarks'}
+                                        </Button>
+                                        <Button
+                                          size="sm"
+                                          variant="secondary"
+                                          onClick={() => handleViewDetails(issue)}
+                                        >
+                                          View Details
+                                        </Button>
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+
+                                <div className="flex flex-wrap gap-2">
+                                  <Button 
+                                    variant="outline" 
+                                    size="sm"
+                                    onClick={() => updateStatus(issue.id, 'pending', issue.user_id)}
+                                    disabled={issue.status === 'pending'}
+                                    className="bg-warning/10 hover:bg-warning/20 text-warning border-warning/20"
+                                  >
+                                    Mark Pending
+                                  </Button>
+                                  <Button 
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => updateStatus(issue.id, 'in_progress', issue.user_id)}
+                                    disabled={issue.status === 'in_progress'}
+                                    className="bg-primary/10 hover:bg-primary/20 text-primary border-primary/20"
+                                  >
+                                    Mark In Progress
+                                  </Button>
+                                  <Button 
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => updateStatus(issue.id, 'resolved', issue.user_id)}
+                                    disabled={issue.status === 'resolved'}
+                                    className="bg-success/10 hover:bg-success/20 text-success border-success/20"
+                                  >
+                                    Mark Resolved
+                                  </Button>
+                                </div>
+                              </div>
                             </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
           </div>
         </main>
       </div>

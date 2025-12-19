@@ -7,11 +7,13 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
-import { AlertCircle, CheckCircle2, Clock, MapPin, Search, User } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AlertCircle, CheckCircle2, Clock, MapPin, Search, User, List, Map } from 'lucide-react';
 import { toast } from 'sonner';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import IssueDetailsModal from '@/components/admin/IssueDetailsModal';
+import IssuesMap from '@/components/admin/IssuesMap';
 import { SLABadge } from '@/components/admin/SLABadge';
 import { useDepartments, Department } from '@/hooks/useDepartments';
 import { useAdminAccess } from '@/hooks/useAdminAccess';
@@ -283,127 +285,154 @@ export default function DepartmentIssues() {
               </div>
             </div>
 
-            {filteredIssues.length === 0 ? (
-              <Card className="shadow-medium">
-                <CardContent className="py-12 text-center">
-                  <p className="text-muted-foreground">No issues found</p>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="grid gap-4">
-                {filteredIssues.map((issue) => {
-                  const assignedWorker = getWorkerById(issue.assigned_worker_id);
-                  
-                  return (
-                    <Card key={issue.id} className="shadow-soft hover:shadow-medium transition-all">
-                      <CardContent className="p-6">
-                        <div className="flex flex-col lg:flex-row gap-6">
-                          {issue.photo_url && (
-                            <div className="lg:w-48 flex-shrink-0">
-                              <img 
-                                src={issue.photo_url} 
-                                alt={issue.title}
-                                className="rounded-lg w-full h-36 object-cover cursor-pointer hover:opacity-90 transition-opacity"
-                                onClick={() => handleViewDetails(issue)}
-                              />
-                            </div>
-                          )}
+            <Tabs defaultValue="list" className="w-full">
+              <TabsList className="mb-4">
+                <TabsTrigger value="list" className="flex items-center gap-2">
+                  <List className="h-4 w-4" />
+                  List View
+                </TabsTrigger>
+                <TabsTrigger value="map" className="flex items-center gap-2">
+                  <Map className="h-4 w-4" />
+                  Map View
+                </TabsTrigger>
+              </TabsList>
 
-                          <div className="flex-1 space-y-4">
-                            <div className="flex flex-wrap justify-between items-start gap-2">
-                              <div className="space-y-1">
-                                <h3 className="text-lg font-semibold">{issue.title}</h3>
-                                <p className="text-sm text-muted-foreground">
-                                  Reported by: {userProfiles[issue.user_id]?.full_name || 'Unknown'}
-                                </p>
-                              </div>
-                              <div className="flex flex-wrap gap-2">
-                                {getStatusBadge(issue.status)}
-                                <SLABadge 
-                                  slaDeadline={issue.sla_deadline} 
-                                  status={issue.status}
-                                  resolvedAt={issue.resolved_at}
-                                />
-                              </div>
-                            </div>
+              <TabsContent value="map">
+                <Card className="shadow-soft">
+                  <CardContent className="p-4 relative">
+                    <IssuesMap 
+                      issues={filteredIssues} 
+                      height="500px" 
+                      onIssueClick={(issue) => handleViewDetails(issue as Issue)}
+                    />
+                  </CardContent>
+                </Card>
+              </TabsContent>
 
-                            <p className="text-sm line-clamp-2">{issue.description}</p>
+              <TabsContent value="list">
+                {filteredIssues.length === 0 ? (
+                  <Card className="shadow-medium">
+                    <CardContent className="py-12 text-center">
+                      <p className="text-muted-foreground">No issues found</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="grid gap-4">
+                    {filteredIssues.map((issue) => {
+                      const assignedWorker = getWorkerById(issue.assigned_worker_id);
+                      
+                      return (
+                        <Card key={issue.id} className="shadow-soft hover:shadow-medium transition-all">
+                          <CardContent className="p-6">
+                            <div className="flex flex-col lg:flex-row gap-6">
+                              {issue.photo_url && (
+                                <div className="lg:w-48 flex-shrink-0">
+                                  <img 
+                                    src={issue.photo_url} 
+                                    alt={issue.title}
+                                    className="rounded-lg w-full h-36 object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                                    onClick={() => handleViewDetails(issue)}
+                                  />
+                                </div>
+                              )}
 
-                            <div className="flex items-start gap-2 text-sm text-muted-foreground">
-                              <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
-                              <p className="font-medium">
-                                {issue.area && issue.district && issue.state
-                                  ? `${issue.area}, ${issue.district}, ${issue.state}`
-                                  : 'Location not specified'}
-                              </p>
-                            </div>
+                              <div className="flex-1 space-y-4">
+                                <div className="flex flex-wrap justify-between items-start gap-2">
+                                  <div className="space-y-1">
+                                    <h3 className="text-lg font-semibold">{issue.title}</h3>
+                                    <p className="text-sm text-muted-foreground">
+                                      Reported by: {userProfiles[issue.user_id]?.full_name || 'Unknown'}
+                                    </p>
+                                  </div>
+                                  <div className="flex flex-wrap gap-2">
+                                    {getStatusBadge(issue.status)}
+                                    <SLABadge 
+                                      slaDeadline={issue.sla_deadline} 
+                                      status={issue.status}
+                                      resolvedAt={issue.resolved_at}
+                                    />
+                                  </div>
+                                </div>
 
-                            {/* Worker Assignment */}
-                            <div className="flex items-center gap-2">
-                              <User className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-sm text-muted-foreground">Assign to:</span>
-                              <Select 
-                                value={issue.assigned_worker_id || ''} 
-                                onValueChange={(val) => assignWorker(issue.id, val)}
-                              >
-                                <SelectTrigger className="w-[200px]">
-                                  <SelectValue placeholder="Select worker" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="">Unassigned</SelectItem>
-                                  {workers.map((worker) => (
-                                    <SelectItem key={worker.id} value={worker.id}>
-                                      {worker.name} ({worker.assigned_area || worker.assigned_district || 'All areas'})
-                                    </SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                            </div>
+                                <p className="text-sm line-clamp-2">{issue.description}</p>
 
-                            <div className="space-y-2">
-                              <div className="flex flex-wrap items-center gap-2">
-                                <span className="text-sm font-medium">Status:</span>
-                                <Select value={issue.status} onValueChange={(val) => updateStatus(issue.id, val, issue.user_id)}>
-                                  <SelectTrigger className="w-[140px]">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="pending">Pending</SelectItem>
-                                    <SelectItem value="in_progress">In Progress</SelectItem>
-                                    <SelectItem value="resolved">Resolved</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
+                                <div className="flex items-start gap-2 text-sm text-muted-foreground">
+                                  <MapPin className="h-4 w-4 mt-0.5 flex-shrink-0" />
+                                  <p className="font-medium">
+                                    {issue.area && issue.district && issue.state
+                                      ? `${issue.area}, ${issue.district}, ${issue.state}`
+                                      : 'Location not specified'}
+                                  </p>
+                                </div>
 
-                              <div className="space-y-2">
-                                <span className="text-sm font-medium">Remarks:</span>
-                                <Textarea
-                                  placeholder="Add remarks for the user..."
-                                  value={editingRemarks[issue.id] ?? issue.admin_remarks ?? ''}
-                                  onChange={(e) => setEditingRemarks((prev) => ({ ...prev, [issue.id]: e.target.value }))}
-                                  className="min-h-[60px]"
-                                />
-                                {editingRemarks[issue.id] !== undefined && (
-                                  <Button size="sm" onClick={() => updateRemarks(issue.id, editingRemarks[issue.id])}>
-                                    Save Remarks
+                                {/* Worker Assignment */}
+                                <div className="flex items-center gap-2">
+                                  <User className="h-4 w-4 text-muted-foreground" />
+                                  <span className="text-sm text-muted-foreground">Assign to:</span>
+                                  <Select 
+                                    value={issue.assigned_worker_id || ''} 
+                                    onValueChange={(val) => assignWorker(issue.id, val)}
+                                  >
+                                    <SelectTrigger className="w-[200px]">
+                                      <SelectValue placeholder="Select worker" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="">Unassigned</SelectItem>
+                                      {workers.map((worker) => (
+                                        <SelectItem key={worker.id} value={worker.id}>
+                                          {worker.name} ({worker.assigned_area || worker.assigned_district || 'All areas'})
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+
+                                <div className="space-y-2">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className="text-sm font-medium">Status:</span>
+                                    <Select value={issue.status} onValueChange={(val) => updateStatus(issue.id, val, issue.user_id)}>
+                                      <SelectTrigger className="w-[140px]">
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="pending">Pending</SelectItem>
+                                        <SelectItem value="in_progress">In Progress</SelectItem>
+                                        <SelectItem value="resolved">Resolved</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+
+                                  <div className="space-y-2">
+                                    <span className="text-sm font-medium">Remarks:</span>
+                                    <Textarea
+                                      placeholder="Add remarks for the user..."
+                                      value={editingRemarks[issue.id] ?? issue.admin_remarks ?? ''}
+                                      onChange={(e) => setEditingRemarks((prev) => ({ ...prev, [issue.id]: e.target.value }))}
+                                      className="min-h-[60px]"
+                                    />
+                                    {editingRemarks[issue.id] !== undefined && (
+                                      <Button size="sm" onClick={() => updateRemarks(issue.id, editingRemarks[issue.id])}>
+                                        Save Remarks
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="flex justify-end">
+                                  <Button variant="outline" size="sm" onClick={() => handleViewDetails(issue)}>
+                                    View Details
                                   </Button>
-                                )}
+                                </div>
                               </div>
                             </div>
-
-                            <div className="flex justify-end">
-                              <Button variant="outline" size="sm" onClick={() => handleViewDetails(issue)}>
-                                View Details
-                              </Button>
-                            </div>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  );
-                })}
-              </div>
-            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
           </div>
         </main>
       </div>
