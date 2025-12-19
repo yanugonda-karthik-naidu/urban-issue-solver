@@ -6,9 +6,10 @@ import { Badge } from '@/components/ui/badge';
 import { toast } from 'sonner';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
+import IssuesMap from '@/components/admin/IssuesMap';
 import { useDepartments, Department } from '@/hooks/useDepartments';
 import { useAdminAccess } from '@/hooks/useAdminAccess';
-import { AlertCircle, CheckCircle2, Clock, Users, FileText, TrendingUp, Building2 } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock, Users, FileText, TrendingUp, Building2, MapPin } from 'lucide-react';
 
 interface DepartmentStats {
   total: number;
@@ -25,6 +26,7 @@ export default function DepartmentDashboard() {
   const [department, setDepartment] = useState<Department | null>(null);
   const [workersCount, setWorkersCount] = useState(0);
   const [recentIssues, setRecentIssues] = useState<any[]>([]);
+  const [allIssues, setAllIssues] = useState<any[]>([]);
   
   const { departments, getDepartmentById } = useDepartments();
   const { adminInfo, isSuperAdmin, loading: adminLoading } = useAdminAccess();
@@ -68,6 +70,7 @@ export default function DepartmentDashboard() {
         ).length || 0,
       };
       setStats(statsData);
+      setAllIssues(issues || []);
       setRecentIssues(issues?.slice(0, 5) || []);
 
       // Fetch workers count
@@ -215,6 +218,19 @@ export default function DepartmentDashboard() {
                 </CardContent>
               </Card>
             </div>
+
+            {/* Issues Map */}
+            <Card className="shadow-soft">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <MapPin className="h-5 w-5" />
+                  Issues Location Map
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="relative">
+                <IssuesMap issues={allIssues} height="400px" />
+              </CardContent>
+            </Card>
 
             {/* Recent Issues */}
             <Card className="shadow-soft">
