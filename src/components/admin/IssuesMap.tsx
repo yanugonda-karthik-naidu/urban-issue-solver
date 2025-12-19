@@ -1,5 +1,4 @@
-import React from 'react';
-import { MapContainer, TileLayer, Marker, Popup } from 'react-leaflet';
+import React, { useEffect, useState } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 
@@ -59,6 +58,20 @@ const createCustomIcon = (status: string | null) => {
 };
 
 const IssuesMap: React.FC<IssuesMapProps> = ({ issues, height = '400px', onIssueClick }) => {
+  const [MapComponents, setMapComponents] = useState<any>(null);
+
+  useEffect(() => {
+    // Dynamically import react-leaflet to avoid SSR issues
+    import('react-leaflet').then((mod) => {
+      setMapComponents({
+        MapContainer: mod.MapContainer,
+        TileLayer: mod.TileLayer,
+        Marker: mod.Marker,
+        Popup: mod.Popup,
+      });
+    });
+  }, []);
+
   // Filter issues with valid coordinates
   const issuesWithCoords = issues.filter(
     (issue) => issue.latitude && issue.longitude
@@ -75,8 +88,18 @@ const IssuesMap: React.FC<IssuesMapProps> = ({ issues, height = '400px', onIssue
 
   const zoom = issuesWithCoords.length > 0 ? 10 : 5;
 
+  if (!MapComponents) {
+    return (
+      <div style={{ height, width: '100%' }} className="rounded-lg overflow-hidden border border-border flex items-center justify-center bg-muted">
+        <p className="text-muted-foreground">Loading map...</p>
+      </div>
+    );
+  }
+
+  const { MapContainer, TileLayer, Marker, Popup } = MapComponents;
+
   return (
-    <div style={{ height, width: '100%' }} className="rounded-lg overflow-hidden border border-border">
+    <div style={{ height, width: '100%' }} className="rounded-lg overflow-hidden border border-border relative">
       <MapContainer
         center={center}
         zoom={zoom}
