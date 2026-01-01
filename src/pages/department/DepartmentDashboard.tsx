@@ -48,10 +48,10 @@ export default function DepartmentDashboard() {
 
   const fetchDepartmentData = async (deptId: string) => {
     try {
-      // Fetch issues for this department
+      // Fetch issues for this department with worker data
       const { data: issues, error: issuesError } = await supabase
         .from('issues')
-        .select('*')
+        .select('*, workers(id, name)')
         .eq('department_id', deptId)
         .order('created_at', { ascending: false });
 

@@ -22,6 +22,11 @@ import { useDepartments } from '@/hooks/useDepartments';
 import { useAdminAccess } from '@/hooks/useAdminAccess';
 import { AdminRemarksSchema } from '@/lib/validation';
 
+interface Worker {
+  id: string;
+  name: string;
+}
+
 interface Issue {
   id: string;
   title: string;
@@ -42,6 +47,8 @@ interface Issue {
   escalated: boolean;
   escalation_level: number;
   resolved_at: string | null;
+  assigned_worker_id: string | null;
+  workers?: Worker | null;
 }
 
 interface UserProfile {
@@ -74,7 +81,7 @@ export default function AllIssues() {
     try {
       const { data: issuesData, error: issuesError } = await supabase
         .from('issues')
-        .select('*')
+        .select('*, workers(id, name)')
         .order('created_at', { ascending: false });
 
       if (issuesError) throw issuesError;
