@@ -18,6 +18,11 @@ import { SLABadge } from '@/components/admin/SLABadge';
 import { useDepartments, Department } from '@/hooks/useDepartments';
 import { useAdminAccess } from '@/hooks/useAdminAccess';
 
+interface WorkerRef {
+  id: string;
+  name: string;
+}
+
 interface Issue {
   id: string;
   title: string;
@@ -37,6 +42,7 @@ interface Issue {
   sla_deadline: string | null;
   resolved_at: string | null;
   assigned_worker_id: string | null;
+  workers?: WorkerRef | null;
 }
 
 interface Worker {
@@ -87,7 +93,7 @@ export default function DepartmentIssues() {
     try {
       let query = supabase
         .from('issues')
-        .select('*')
+        .select('*, workers(id, name)')
         .eq('department_id', deptId)
         .order('created_at', { ascending: false });
 

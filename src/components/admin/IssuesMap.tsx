@@ -12,8 +12,12 @@ import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Layers, Filter, Flame, Search, Download, FileText, Pencil, X } from 'lucide-react';
+import { Calendar } from '@/components/ui/calendar';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Layers, Filter, Flame, Search, Download, FileText, Pencil, X, CalendarIcon, User } from 'lucide-react';
 import { jsPDF } from 'jspdf';
+import { format, isWithinInterval, startOfDay, endOfDay } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 // Fix for default marker icons in Leaflet with Vite
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -28,6 +32,11 @@ declare module 'leaflet' {
   function heatLayer(latlngs: Array<[number, number, number?]>, options?: any): any;
 }
 
+interface Worker {
+  id: string;
+  name: string;
+}
+
 interface Issue {
   id: string;
   title: string;
@@ -38,6 +47,9 @@ interface Issue {
   longitude: number | null;
   area: string | null;
   district: string | null;
+  created_at?: string | null;
+  assigned_worker_id?: string | null;
+  workers?: Worker | null;
 }
 
 interface IssuesMapProps {
@@ -109,6 +121,10 @@ export default function IssuesMap({ issues, height = '400px', onIssueClick }: Is
   const [categoryFilters, setCategoryFilters] = useState<Set<string>>(new Set(CATEGORY_OPTIONS));
   const [searchQuery, setSearchQuery] = useState('');
   const [drawnBounds, setDrawnBounds] = useState<L.LatLngBounds | null>(null);
+  
+  // Date range filter
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined);
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined);
 
   const issuesWithCoords = useMemo(
     () => issues.filter((i) => i.latitude != null && i.longitude != null),
@@ -131,15 +147,31 @@ export default function IssuesMap({ issues, height = '400px', onIssueClick }: Is
       const boundsMatch = !drawnBounds || 
         drawnBounds.contains(L.latLng(issue.latitude!, issue.longitude!));
       
-      return statusMatch && categoryMatch && searchMatch && boundsMatch;
+      // Date range filter
+      let dateMatch = true;
+      if (issue.created_at && (dateFrom || dateTo)) {
+        const issueDate = new Date(issue.created_at);
+        if (dateFrom && dateTo) {
+          dateMatch = isWithinInterval(issueDate, { 
+            start: startOfDay(dateFrom), 
+            end: endOfDay(dateTo) 
+          });
+        } else if (dateFrom) {
+          dateMatch = issueDate >= startOfDay(dateFrom);
+        } else if (dateTo) {
+          dateMatch = issueDate <= endOfDay(dateTo);
+        }
+      }
+      
+      return statusMatch && categoryMatch && searchMatch && boundsMatch && dateMatch;
     });
-  }, [issuesWithCoords, statusFilters, categoryFilters, searchQuery, drawnBounds]);
+  }, [issuesWithCoords, statusFilters, categoryFilters, searchQuery, drawnBounds, dateFrom, dateTo]);
 
   const defaultCenter: [number, number] = [20.5937, 78.9629];
 
   // Export to CSV
   const exportToCSV = useCallback(() => {
-    const headers = ['ID', 'Title', 'Category', 'Status', 'Area', 'District', 'Latitude', 'Longitude'];
+    const headers = ['ID', 'Title', 'Category', 'Status', 'Area', 'District', 'Latitude', 'Longitude', 'Assigned Worker', 'Created At'];
     const rows = filteredIssues.map(issue => [
       issue.id,
       `"${issue.title.replace(/"/g, '""')}"`,
@@ -148,7 +180,9 @@ export default function IssuesMap({ issues, height = '400px', onIssueClick }: Is
       issue.area || '',
       issue.district || '',
       issue.latitude?.toString() || '',
-      issue.longitude?.toString() || ''
+      issue.longitude?.toString() || '',
+      issue.workers?.name || 'Unassigned',
+      issue.created_at ? format(new Date(issue.created_at), 'yyyy-MM-dd') : ''
     ]);
     
     const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
@@ -338,8 +372,11 @@ export default function IssuesMap({ issues, height = '400px', onIssueClick }: Is
         });
 
         const statusLabel = issue.status || 'pending';
+        const workerName = issue.workers?.name;
+        const createdDate = issue.created_at ? format(new Date(issue.created_at), 'MMM d, yyyy') : '';
+        
         const popupHtml = `
-          <div style="font-family: ui-sans-serif, system-ui; padding: 4px 2px; max-width: 220px;">
+          <div style="font-family: ui-sans-serif, system-ui; padding: 4px 2px; max-width: 240px;">
             <div style="font-weight: 700; font-size: 12px; line-height: 1.2;">
               ${issue.title}
             </div>
@@ -357,6 +394,22 @@ export default function IssuesMap({ issues, height = '400px', onIssueClick }: Is
               ">${statusLabel}</span>
             </div>
             ${issue.area ? `<div style="font-size: 12px; opacity: 0.7; margin-top: 6px;">${issue.area}${issue.district ? `, ${issue.district}` : ''}</div>` : ''}
+            ${workerName ? `
+              <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid hsl(var(--border));">
+                <div style="font-size: 11px; display: flex; align-items: center; gap: 4px;">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+                  <span style="font-weight: 600;">Assigned:</span>
+                  <span>${workerName}</span>
+                </div>
+              </div>
+            ` : `
+              <div style="margin-top: 8px; padding-top: 8px; border-top: 1px solid hsl(var(--border));">
+                <div style="font-size: 11px; color: hsl(var(--muted-foreground));">
+                  <em>Unassigned</em>
+                </div>
+              </div>
+            `}
+            ${createdDate ? `<div style="font-size: 10px; opacity: 0.6; margin-top: 4px;">Reported: ${createdDate}</div>` : ''}
           </div>
         `;
 
@@ -435,6 +488,11 @@ export default function IssuesMap({ issues, height = '400px', onIssueClick }: Is
   const clearDrawnArea = () => {
     drawnItemsRef.current?.clearLayers();
     setDrawnBounds(null);
+  };
+
+  const clearDateFilter = () => {
+    setDateFrom(undefined);
+    setDateTo(undefined);
   };
 
   return (
@@ -550,10 +608,79 @@ export default function IssuesMap({ issues, height = '400px', onIssueClick }: Is
           </div>
         </div>
 
+        {/* Date Range Filter */}
+        <div className="space-y-2 pt-2 border-t border-border">
+          <p className="text-xs font-semibold flex items-center gap-1.5">
+            <CalendarIcon className="h-3.5 w-3.5" />
+            Date Range
+          </p>
+          <div className="space-y-1.5">
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={cn(
+                    "w-full h-7 justify-start text-left font-normal text-xs",
+                    !dateFrom && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-1.5 h-3 w-3" />
+                  {dateFrom ? format(dateFrom, "MMM d, yyyy") : "From date"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 z-[1001]" align="start">
+                <Calendar
+                  mode="single"
+                  selected={dateFrom}
+                  onSelect={setDateFrom}
+                  initialFocus
+                  className="p-3 pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={cn(
+                    "w-full h-7 justify-start text-left font-normal text-xs",
+                    !dateTo && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-1.5 h-3 w-3" />
+                  {dateTo ? format(dateTo, "MMM d, yyyy") : "To date"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0 z-[1001]" align="start">
+                <Calendar
+                  mode="single"
+                  selected={dateTo}
+                  onSelect={setDateTo}
+                  initialFocus
+                  className="p-3 pointer-events-auto"
+                />
+              </PopoverContent>
+            </Popover>
+            {(dateFrom || dateTo) && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={clearDateFilter}
+                className="h-6 text-xs w-full text-destructive hover:text-destructive"
+              >
+                <X className="h-3 w-3 mr-1" />
+                Clear Dates
+              </Button>
+            )}
+          </div>
+        </div>
+
         {/* Filter Toggle */}
         <button
           onClick={() => setShowFilters(!showFilters)}
-          className="flex items-center gap-1.5 text-xs font-medium hover:text-primary transition-colors w-full"
+          className="flex items-center gap-1.5 text-xs font-medium hover:text-primary transition-colors w-full pt-2 border-t border-border"
         >
           <Filter className="h-3.5 w-3.5" />
           {showFilters ? 'Hide Filters' : 'Show Filters'}
