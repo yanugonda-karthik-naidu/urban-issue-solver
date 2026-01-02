@@ -8,6 +8,7 @@ import { Header } from "./components/Header";
 import { FloatingChatbot } from "./components/FloatingChatbot";
 import { AdminRoute } from "./components/auth/AdminRoute";
 import { PageSkeleton, AdminPageSkeleton, MapPageSkeleton } from "./components/PageSkeleton";
+import { RouteProgress } from "./components/RouteProgress";
 
 // Eagerly loaded public pages
 import Home from "./pages/Home";
@@ -62,6 +63,7 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
+        <RouteProgress />
         {/* Render the floating chatbot on all non-admin routes */}
         {/* ChatbotVisibility must be rendered inside BrowserRouter so useLocation works */}
         {/* Define a small component that hides the bot on admin routes */}

@@ -31,13 +31,8 @@ export const useRoutePrefetch = () => {
     if (importFn) {
       // Mark as prefetched immediately to prevent duplicate calls
       prefetchedRoutes.add(path);
-      
-      // Use requestIdleCallback for better performance
-      if ('requestIdleCallback' in window) {
-        requestIdleCallback(() => importFn());
-      } else {
-        setTimeout(() => importFn(), 100);
-      }
+      // Execute immediately for instant loading
+      importFn();
     }
   }, []);
 
