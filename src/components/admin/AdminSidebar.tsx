@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { LayoutDashboard, FileText, Users, BarChart3, Settings, LogOut, Building2, UserCog } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useAdminAccess } from '@/hooks/useAdminAccess';
+import { useRoutePrefetch } from '@/hooks/useRoutePrefetch';
 
 const superAdminMenuItems = [
   { title: 'Dashboard', url: '/admin', icon: LayoutDashboard },
@@ -27,6 +28,7 @@ export default function AdminSidebar() {
   const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const { isSuperAdmin, loading } = useAdminAccess();
+  const { onMouseEnter } = useRoutePrefetch();
 
   const menuItems = isSuperAdmin ? superAdminMenuItems : departmentAdminMenuItems;
   const title = isSuperAdmin ? 'Admin Control Center' : 'Department Control Center';
@@ -77,6 +79,8 @@ export default function AdminSidebar() {
             key={item.url}
             to={item.url}
             end={item.url === '/admin' || item.url === '/department'}
+            onMouseEnter={onMouseEnter(item.url)}
+            onFocus={onMouseEnter(item.url)}
             className={({ isActive }) => cn(
               'flex items-center gap-3 rounded-lg transition-colors',
               collapsed ? 'px-2 py-3 justify-center' : 'px-4 py-3',
