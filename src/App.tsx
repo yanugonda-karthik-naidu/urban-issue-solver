@@ -7,6 +7,7 @@ import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { Header } from "./components/Header";
 import { FloatingChatbot } from "./components/FloatingChatbot";
 import { AdminRoute } from "./components/auth/AdminRoute";
+import { PageSkeleton, AdminPageSkeleton, MapPageSkeleton } from "./components/PageSkeleton";
 
 // Eagerly loaded public pages
 import Home from "./pages/Home";
@@ -38,12 +39,22 @@ import "./i18n/config";
 
 const queryClient = new QueryClient();
 
-// Loading fallback component
-const PageLoader = () => (
-  <div className="flex items-center justify-center min-h-[50vh]">
-    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-  </div>
-);
+// Wrapper to show appropriate skeleton based on route
+const RouteSkeleton = () => {
+  const location = useLocation();
+  
+  if (location.pathname.startsWith('/admin/issues') || 
+      location.pathname.startsWith('/department/issues')) {
+    return <MapPageSkeleton />;
+  }
+  
+  if (location.pathname.startsWith('/admin') || 
+      location.pathname.startsWith('/department')) {
+    return <AdminPageSkeleton />;
+  }
+  
+  return <PageSkeleton />;
+};
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -65,7 +76,7 @@ const App = () => (
 
           return <ChatbotVisibility />;
         })()}
-        <Suspense fallback={<PageLoader />}>
+        <Suspense fallback={<RouteSkeleton />}>
           <Routes>
             {/* 🌍 Public Routes */}
             <Route path="/" element={<><Header /><Home /></>} />
