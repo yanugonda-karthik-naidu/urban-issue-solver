@@ -6,6 +6,7 @@ import { BrowserRouter, useLocation } from "react-router-dom";
 import { FloatingChatbot } from "./components/FloatingChatbot";
 import { RouteProgress } from "./components/RouteProgress";
 import { AnimatedRoutes } from "./components/AnimatedRoutes";
+import OfflineIndicator from "./components/OfflineIndicator";
 
 import "./i18n/config";
 
@@ -24,6 +25,7 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
+      <OfflineIndicator />
       <BrowserRouter>
         <RouteProgress />
         <ChatbotVisibility />

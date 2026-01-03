@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -15,6 +15,7 @@ import {
 import { AlertCircle, CheckCircle2, Clock, Plus } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatusTimeline } from '@/components/StatusTimeline';
+import PullToRefresh from '@/components/PullToRefresh';
 
 interface Issue {
   id: string;
@@ -60,27 +61,27 @@ export default function Dashboard() {
     return () => subscription.unsubscribe();
   }, [navigate]);
 
+  const fetchIssues = useCallback(async () => {
+    if (!userId) return;
+    
+    const { data, error } = await supabase
+      .from('issues')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      toast.error('Failed to load issues');
+    } else {
+      setIssues((data as Issue[]) || []);
+    }
+    setLoading(false);
+  }, [userId]);
+
   useEffect(() => {
     if (!userId) return;
 
-    const fetchIssues = async () => {
-      const { data, error } = await supabase
-        .from('issues')
-        .select('*')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        toast.error('Failed to load issues');
-      } else {
-        setIssues((data as Issue[]) || []);
-      }
-      setLoading(false);
-    };
-
     fetchIssues();
-
-    // Set up real-time subscription for automatic updates from admin
     const channel = supabase
       .channel('user-issues-changes')
       .on(
@@ -107,7 +108,12 @@ export default function Dashboard() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [userId]);
+  }, [userId, fetchIssues]);
+
+  const handleRefresh = useCallback(async () => {
+    await fetchIssues();
+    toast.success('Content refreshed');
+  }, [fetchIssues]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -139,8 +145,9 @@ export default function Dashboard() {
   // displayedIssues removed — rendering all issues
 
   return (
-    <div className="min-h-screen bg-surface-50">
-      <div className="container py-8">
+    <PullToRefresh onRefresh={handleRefresh}>
+      <div className="min-h-screen bg-surface-50">
+        <div className="container py-8">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8 gap-4">
           <div>
             <h1 className="text-3xl font-extrabold text-slate-900">{t('dashboard.title')}</h1>
@@ -328,5 +335,6 @@ export default function Dashboard() {
         </Dialog>
       </div>
     </div>
+    </PullToRefresh>
   );
 }
