@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, ReactNode } from 'react';
 import { motion, useMotionValue, useTransform, animate } from 'framer-motion';
 import { RefreshCw } from 'lucide-react';
+import { triggerHaptic } from '@/lib/haptics';
 
 interface PullToRefreshProps {
   children: ReactNode;
@@ -11,6 +12,7 @@ interface PullToRefreshProps {
 const PullToRefresh = ({ children, onRefresh, threshold = 80 }: PullToRefreshProps) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [isPulling, setIsPulling] = useState(false);
+  const [hasTriggeredHaptic, setHasTriggeredHaptic] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const startY = useRef(0);
   const pullDistance = useMotionValue(0);
@@ -23,6 +25,7 @@ const PullToRefresh = ({ children, onRefresh, threshold = 80 }: PullToRefreshPro
     if (containerRef.current?.scrollTop === 0 && !isRefreshing) {
       startY.current = e.touches[0].clientY;
       setIsPulling(true);
+      setHasTriggeredHaptic(false);
     }
   }, [isRefreshing]);
 
@@ -31,8 +34,17 @@ const PullToRefresh = ({ children, onRefresh, threshold = 80 }: PullToRefreshPro
     
     const currentY = e.touches[0].clientY;
     const diff = Math.max(0, (currentY - startY.current) * 0.5);
-    pullDistance.set(Math.min(diff, threshold * 1.5));
-  }, [isPulling, isRefreshing, pullDistance, threshold]);
+    const newPullDistance = Math.min(diff, threshold * 1.5);
+    pullDistance.set(newPullDistance);
+    
+    // Trigger haptic when crossing threshold
+    if (newPullDistance >= threshold && !hasTriggeredHaptic) {
+      triggerHaptic('medium');
+      setHasTriggeredHaptic(true);
+    } else if (newPullDistance < threshold && hasTriggeredHaptic) {
+      setHasTriggeredHaptic(false);
+    }
+  }, [isPulling, isRefreshing, pullDistance, threshold, hasTriggeredHaptic]);
 
   const handleTouchEnd = useCallback(async () => {
     if (!isPulling) return;
@@ -41,6 +53,7 @@ const PullToRefresh = ({ children, onRefresh, threshold = 80 }: PullToRefreshPro
     
     if (currentPull >= threshold && !isRefreshing) {
       setIsRefreshing(true);
+      triggerHaptic('success');
       animate(pullDistance, threshold, { duration: 0.2 });
       
       try {
@@ -54,6 +67,7 @@ const PullToRefresh = ({ children, onRefresh, threshold = 80 }: PullToRefreshPro
     }
     
     setIsPulling(false);
+    setHasTriggeredHaptic(false);
   }, [isPulling, pullDistance, threshold, isRefreshing, onRefresh]);
 
   return (

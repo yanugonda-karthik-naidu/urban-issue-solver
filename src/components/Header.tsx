@@ -6,6 +6,7 @@ import { Button } from './ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import UserNotificationBell from './UserNotificationBell';
+import { SyncButton } from './SyncButton';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -95,6 +96,9 @@ export const Header = () => {
               </Link>
             </>
           )}
+
+          {/* Sync button */}
+          {user && <SyncButton />}
 
           {/* Notification bell */}
           {user && <UserNotificationBell />}
