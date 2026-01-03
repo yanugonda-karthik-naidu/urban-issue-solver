@@ -1,18 +1,24 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { WifiOff, Wifi, RefreshCw, CheckCircle } from 'lucide-react';
+import { WifiOff, RefreshCw, CheckCircle, CloudOff, Upload } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import { useBackgroundSync } from '@/hooks/useBackgroundSync';
+import { Button } from './ui/button';
 
 const OfflineIndicator = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [showReconnected, setShowReconnected] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const queryClient = useQueryClient();
+  const { queueLength, processQueue, isSyncing: isQueueSyncing } = useBackgroundSync();
 
   const syncData = useCallback(async () => {
     setIsSyncing(true);
     try {
-      // Invalidate all queries to refetch fresh data
+      // Process queued requests first
+      await processQueue();
+      
+      // Then invalidate all queries to refetch fresh data
       await queryClient.invalidateQueries();
       
       // Small delay to show sync animation
@@ -20,7 +26,7 @@ const OfflineIndicator = () => {
     } finally {
       setIsSyncing(false);
     }
-  }, [queryClient]);
+  }, [queryClient, processQueue]);
 
   useEffect(() => {
     const handleOnline = async () => {
@@ -48,9 +54,11 @@ const OfflineIndicator = () => {
     };
   }, [syncData]);
 
+  const showIndicator = !isOnline || showReconnected || queueLength > 0;
+
   return (
     <AnimatePresence>
-      {(!isOnline || showReconnected) && (
+      {showIndicator && (
         <motion.div
           initial={{ y: -100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
@@ -62,9 +70,11 @@ const OfflineIndicator = () => {
             className={`
               flex items-center gap-2 px-4 py-2 rounded-full shadow-lg backdrop-blur-md
               pointer-events-auto
-              ${isOnline 
-                ? 'bg-green-500/90 text-white' 
-                : 'bg-destructive/90 text-destructive-foreground'
+              ${!isOnline 
+                ? 'bg-destructive/90 text-destructive-foreground' 
+                : queueLength > 0 
+                  ? 'bg-amber-500/90 text-white'
+                  : 'bg-green-500/90 text-white'
               }
             `}
             layout
@@ -73,8 +83,13 @@ const OfflineIndicator = () => {
               <>
                 <WifiOff className="w-4 h-4" />
                 <span className="text-sm font-medium">You're offline</span>
+                {queueLength > 0 && (
+                  <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">
+                    {queueLength} pending
+                  </span>
+                )}
               </>
-            ) : isSyncing ? (
+            ) : isSyncing || isQueueSyncing ? (
               <>
                 <motion.div
                   animate={{ rotate: 360 }}
@@ -82,7 +97,23 @@ const OfflineIndicator = () => {
                 >
                   <RefreshCw className="w-4 h-4" />
                 </motion.div>
-                <span className="text-sm font-medium">Syncing data...</span>
+                <span className="text-sm font-medium">
+                  Syncing {queueLength > 0 ? `${queueLength} requests...` : 'data...'}
+                </span>
+              </>
+            ) : queueLength > 0 ? (
+              <>
+                <CloudOff className="w-4 h-4" />
+                <span className="text-sm font-medium">{queueLength} pending requests</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-6 px-2 text-xs bg-white/20 hover:bg-white/30"
+                  onClick={syncData}
+                >
+                  <Upload className="w-3 h-3 mr-1" />
+                  Sync now
+                </Button>
               </>
             ) : (
               <>

@@ -109,6 +109,13 @@ export default defineConfig(({ mode }) => ({
               networkTimeoutSeconds: 10,
               cacheableResponse: {
                 statuses: [0, 200]
+              },
+              // Enable background sync for failed POST/PUT/DELETE requests
+              backgroundSync: {
+                name: 'supabase-sync-queue',
+                options: {
+                  maxRetentionTime: 24 * 60 // Retry for up to 24 hours
+                }
               }
             }
           },
