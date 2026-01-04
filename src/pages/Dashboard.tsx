@@ -12,10 +12,12 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
-import { AlertCircle, CheckCircle2, Clock, Plus } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock, Plus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { StatusTimeline } from '@/components/StatusTimeline';
 import PullToRefresh from '@/components/PullToRefresh';
+import { ConflictResolutionDialog, useConflictResolution, ConflictData } from '@/components/ConflictResolutionDialog';
+import { useOptimisticIssues } from '@/hooks/useOptimisticIssues';
 
 interface Issue {
   id: string;
@@ -40,6 +42,12 @@ export default function Dashboard() {
   const [userId, setUserId] = useState<string | null>(null);
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  
+  // Conflict resolution
+  const { conflicts, isOpen: conflictDialogOpen, setIsOpen: setConflictDialogOpen, addConflict, clearConflicts } = useConflictResolution();
+  
+  // Optimistic updates
+  const { updateIssueStatus, deleteIssue } = useOptimisticIssues(userId);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -114,6 +122,44 @@ export default function Dashboard() {
     await fetchIssues();
     toast.success('Content refreshed');
   }, [fetchIssues]);
+
+  // Handle status change with optimistic update
+  const handleStatusChange = useCallback(async (issueId: string, newStatus: Issue['status']) => {
+    await updateIssueStatus(issueId, newStatus, (conflict) => {
+      addConflict(conflict as ConflictData);
+    });
+  }, [updateIssueStatus, addConflict]);
+
+  // Handle conflict resolution
+  const handleConflictResolution = useCallback(async (resolutions: Map<string, 'local' | 'server'>) => {
+    for (const [conflictId, choice] of resolutions) {
+      const conflict = conflicts.find(c => c.id === conflictId);
+      if (!conflict) continue;
+
+      if (choice === 'local') {
+        // Apply local value
+        const issueId = conflictId.replace('-status', '');
+        await supabase
+          .from('issues')
+          .update({ [conflict.field]: conflict.localValue })
+          .eq('id', issueId);
+      }
+      // If 'server', we don't need to do anything - server value is already there
+    }
+    
+    clearConflicts();
+    await fetchIssues();
+    toast.success('Conflicts resolved');
+  }, [conflicts, clearConflicts, fetchIssues]);
+
+  // Handle issue deletion
+  const handleDeleteIssue = useCallback(async (issueId: string) => {
+    if (confirm('Are you sure you want to delete this issue?')) {
+      await deleteIssue(issueId);
+      setDialogOpen(false);
+      setSelectedIssue(null);
+    }
+  }, [deleteIssue]);
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -328,11 +374,28 @@ export default function Dashboard() {
               </div>
             )}
 
-            <div className="mt-4 flex justify-end">
+            <div className="mt-4 flex justify-between">
+              <Button 
+                variant="destructive" 
+                size="sm"
+                onClick={() => selectedIssue && handleDeleteIssue(selectedIssue.id)}
+                className="gap-1"
+              >
+                <Trash2 className="h-4 w-4" />
+                Delete
+              </Button>
               <Button onClick={() => setDialogOpen(false)}>Close</Button>
             </div>
           </DialogContent>
         </Dialog>
+
+        {/* Conflict Resolution Dialog */}
+        <ConflictResolutionDialog
+          conflicts={conflicts}
+          open={conflictDialogOpen}
+          onOpenChange={setConflictDialogOpen}
+          onResolve={handleConflictResolution}
+        />
       </div>
     </div>
     </PullToRefresh>
