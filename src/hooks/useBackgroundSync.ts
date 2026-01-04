@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { syncQueue, QueuedRequest } from '@/lib/syncQueue';
 import { toast } from 'sonner';
 import { triggerHaptic } from '@/lib/haptics';
+import { pushNotifications } from '@/lib/pushNotifications';
 
 interface BackgroundSyncState {
   isOnline: boolean;
@@ -104,10 +105,14 @@ export const useBackgroundSync = (): BackgroundSyncState => {
       if (successCount > 0) {
         triggerHaptic('success');
         toast.success(`Synced ${successCount} pending ${successCount === 1 ? 'request' : 'requests'}`);
+        
+        // Send push notification if app is in background
+        await pushNotifications.notifySyncComplete(successCount, failCount);
       }
 
       if (failCount > 0) {
         setLastSyncError(`${failCount} requests failed to sync`);
+        await pushNotifications.notifySyncFailed(`${failCount} requests failed to sync`);
       }
     } catch (error) {
       console.error('Background sync error:', error);
@@ -120,8 +125,10 @@ export const useBackgroundSync = (): BackgroundSyncState => {
 
   // Handle online/offline events
   useEffect(() => {
-    const handleOnline = () => {
+    const handleOnline = async () => {
       setIsOnline(true);
+      // Send push notification when back online
+      await pushNotifications.notifyBackOnline();
       // Auto-process queue when coming back online
       processQueue();
     };
