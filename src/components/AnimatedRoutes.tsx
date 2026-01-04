@@ -17,6 +17,7 @@ const ReportIssue = lazy(() => import('@/pages/ReportIssue'));
 const CivicGuide = lazy(() => import('@/pages/CivicGuide'));
 const Profile = lazy(() => import('@/pages/Profile'));
 const PostFeed = lazy(() => import('@/pages/PostFeed'));
+const SyncStatus = lazy(() => import('@/pages/SyncStatus'));
 
 // Lazy loaded admin pages (heavy components)
 const AdminDashboard = lazy(() => import('@/pages/AdminDashboard'));
@@ -94,6 +95,13 @@ export const AnimatedRoutes = () => {
           <Route path="/community" element={
             <PageTransition>
               <Header /><PostFeed />
+            </PageTransition>
+          } />
+
+          {/* 🔄 Sync Status Page */}
+          <Route path="/sync" element={
+            <PageTransition>
+              <SyncStatus />
             </PageTransition>
           } />
 
