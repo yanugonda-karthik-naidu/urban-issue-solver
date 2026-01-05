@@ -1,5 +1,4 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import { WifiOff, RefreshCw, CheckCircle, CloudOff, Upload, ExternalLink } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
@@ -11,7 +10,6 @@ const OfflineIndicator = () => {
   const [showReconnected, setShowReconnected] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const queryClient = useQueryClient();
-  const navigate = useNavigate();
   const { queueLength, processQueue, isSyncing: isQueueSyncing } = useBackgroundSync();
 
   const syncData = useCallback(async () => {
@@ -116,14 +114,12 @@ const OfflineIndicator = () => {
                   <Upload className="w-3 h-3 mr-1" />
                   Sync now
                 </Button>
-                <Button
-                  size="sm"
-                  variant="ghost"
-                  className="h-6 px-2 text-xs bg-white/20 hover:bg-white/30"
-                  onClick={() => navigate('/sync')}
+                <a
+                  href="/sync"
+                  className="h-6 px-2 text-xs bg-white/20 hover:bg-white/30 rounded inline-flex items-center"
                 >
                   <ExternalLink className="w-3 h-3" />
-                </Button>
+                </a>
               </>
             ) : (
               <>
