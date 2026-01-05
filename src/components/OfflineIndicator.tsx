@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { WifiOff, RefreshCw, CheckCircle, CloudOff, Upload, ExternalLink, RefreshCcw } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useBackgroundSync } from '@/hooks/useBackgroundSync';
+import { triggerHaptic } from '@/lib/haptics';
 import { Button } from './ui/button';
 const OfflineIndicator = () => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -146,7 +147,10 @@ const OfflineIndicator = () => {
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.5 }}
-          onClick={() => navigate('/sync')}
+          onClick={() => {
+            triggerHaptic('medium');
+            navigate('/sync');
+          }}
           className={`
             fixed bottom-20 right-4 z-50 w-12 h-12 rounded-full shadow-lg
             flex items-center justify-center
