@@ -9,18 +9,30 @@ interface BackgroundSyncState {
   isSyncing: boolean;
   queueLength: number;
   lastSyncError: string | null;
+  nextRetryAt: Date | null;
   processQueue: () => Promise<void>;
 }
 
-const MAX_RETRIES = 3;
-const RETRY_DELAY_MS = 1000;
+const MAX_RETRIES = 5;
+const BASE_DELAY_MS = 1000; // 1 second
+const MAX_DELAY_MS = 60000; // 1 minute max
+
+// Calculate exponential backoff delay
+const getBackoffDelay = (retryCount: number): number => {
+  const delay = Math.min(BASE_DELAY_MS * Math.pow(2, retryCount), MAX_DELAY_MS);
+  // Add jitter (±25%) to prevent thundering herd
+  const jitter = delay * 0.25 * (Math.random() * 2 - 1);
+  return Math.round(delay + jitter);
+};
 
 export const useBackgroundSync = (): BackgroundSyncState => {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [isSyncing, setIsSyncing] = useState(false);
   const [queueLength, setQueueLength] = useState(0);
   const [lastSyncError, setLastSyncError] = useState<string | null>(null);
+  const [nextRetryAt, setNextRetryAt] = useState<Date | null>(null);
   const syncInProgressRef = useRef(false);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Update queue length
   const updateQueueLength = useCallback(async () => {
@@ -32,8 +44,30 @@ export const useBackgroundSync = (): BackgroundSyncState => {
     }
   }, []);
 
+  // Schedule next retry with exponential backoff
+  const scheduleRetry = useCallback((retryCount: number) => {
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+    }
+
+    const delay = getBackoffDelay(retryCount);
+    const retryTime = new Date(Date.now() + delay);
+    setNextRetryAt(retryTime);
+
+    console.log(`Scheduling retry in ${delay}ms (attempt ${retryCount + 1})`);
+    
+    retryTimeoutRef.current = setTimeout(() => {
+      setNextRetryAt(null);
+      if (navigator.onLine) {
+        processQueueInternal();
+      }
+    }, delay);
+  }, []);
+
   // Process a single request
-  const processRequest = useCallback(async (request: QueuedRequest): Promise<boolean> => {
+  const processRequest = useCallback(async (request: QueuedRequest): Promise<{ success: boolean; shouldRetry: boolean }> => {
+    const urlPath = new URL(request.url).pathname;
+    
     try {
       const response = await fetch(request.url, {
         method: request.method,
@@ -43,27 +77,27 @@ export const useBackgroundSync = (): BackgroundSyncState => {
 
       if (response.ok) {
         await syncQueue.removeFromQueue(request.id);
-        return true;
+        return { success: true, shouldRetry: false };
       }
 
       // If server error, we might want to retry
       if (response.status >= 500) {
         await syncQueue.updateRetryCount(request.id);
-        return false;
+        return { success: false, shouldRetry: true };
       }
 
       // Client error (4xx) - remove from queue as retrying won't help
       await syncQueue.removeFromQueue(request.id);
-      return true;
+      return { success: false, shouldRetry: false };
     } catch (error) {
       // Network error - keep in queue for retry
       await syncQueue.updateRetryCount(request.id);
-      return false;
+      return { success: false, shouldRetry: true };
     }
   }, []);
 
-  // Process entire queue
-  const processQueue = useCallback(async () => {
+  // Internal process queue function
+  const processQueueInternal = useCallback(async () => {
     if (syncInProgressRef.current || !navigator.onLine) return;
 
     syncInProgressRef.current = true;
@@ -81,6 +115,8 @@ export const useBackgroundSync = (): BackgroundSyncState => {
 
       let successCount = 0;
       let failCount = 0;
+      let maxRetryCount = 0;
+      let hasRetryableFailures = false;
 
       for (const request of queue) {
         // Skip if max retries exceeded
@@ -90,13 +126,15 @@ export const useBackgroundSync = (): BackgroundSyncState => {
           continue;
         }
 
-        const success = await processRequest(request);
+        const { success, shouldRetry } = await processRequest(request);
         if (success) {
           successCount++;
         } else {
           failCount++;
-          // Add delay between retries
-          await new Promise(resolve => setTimeout(resolve, RETRY_DELAY_MS));
+          if (shouldRetry) {
+            hasRetryableFailures = true;
+            maxRetryCount = Math.max(maxRetryCount, request.retryCount + 1);
+          }
         }
       }
 
@@ -105,29 +143,45 @@ export const useBackgroundSync = (): BackgroundSyncState => {
       if (successCount > 0) {
         triggerHaptic('success');
         toast.success(`Synced ${successCount} pending ${successCount === 1 ? 'request' : 'requests'}`);
-        
-        // Send push notification if app is in background
         await pushNotifications.notifySyncComplete(successCount, failCount);
       }
 
       if (failCount > 0) {
         setLastSyncError(`${failCount} requests failed to sync`);
-        await pushNotifications.notifySyncFailed(`${failCount} requests failed to sync`);
+        
+        // Schedule automatic retry with exponential backoff
+        if (hasRetryableFailures) {
+          scheduleRetry(maxRetryCount);
+          toast.error(`${failCount} requests failed. Retrying automatically...`);
+        } else {
+          await pushNotifications.notifySyncFailed(`${failCount} requests failed to sync`);
+        }
       }
     } catch (error) {
       console.error('Background sync error:', error);
       setLastSyncError('Sync failed');
+      // Schedule retry on general failure
+      scheduleRetry(0);
     } finally {
       setIsSyncing(false);
       syncInProgressRef.current = false;
     }
-  }, [processRequest, updateQueueLength]);
+  }, [processRequest, updateQueueLength, scheduleRetry]);
+
+  // Public process queue function
+  const processQueue = useCallback(async () => {
+    // Clear any pending retry when manually triggered
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      setNextRetryAt(null);
+    }
+    await processQueueInternal();
+  }, [processQueueInternal]);
 
   // Handle online/offline events
   useEffect(() => {
     const handleOnline = async () => {
       setIsOnline(true);
-      // Send push notification when back online
       await pushNotifications.notifyBackOnline();
       // Auto-process queue when coming back online
       processQueue();
@@ -135,6 +189,11 @@ export const useBackgroundSync = (): BackgroundSyncState => {
 
     const handleOffline = () => {
       setIsOnline(false);
+      // Clear retry timer when going offline
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        setNextRetryAt(null);
+      }
     };
 
     window.addEventListener('online', handleOnline);
@@ -145,8 +204,7 @@ export const useBackgroundSync = (): BackgroundSyncState => {
 
     // Check for service worker background sync support
     if ('serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype) {
-      navigator.serviceWorker.ready.then(registration => {
-        // Listen for sync events from service worker
+      navigator.serviceWorker.ready.then(() => {
         navigator.serviceWorker.addEventListener('message', (event) => {
           if (event.data?.type === 'SYNC_COMPLETE') {
             updateQueueLength();
@@ -158,6 +216,9 @@ export const useBackgroundSync = (): BackgroundSyncState => {
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+      }
     };
   }, [processQueue, updateQueueLength]);
 
@@ -167,7 +228,7 @@ export const useBackgroundSync = (): BackgroundSyncState => {
 
     const interval = setInterval(() => {
       updateQueueLength();
-    }, 30000); // Check every 30 seconds
+    }, 30000);
 
     return () => clearInterval(interval);
   }, [isOnline, updateQueueLength]);
@@ -177,6 +238,7 @@ export const useBackgroundSync = (): BackgroundSyncState => {
     isSyncing,
     queueLength,
     lastSyncError,
+    nextRetryAt,
     processQueue,
   };
 };
@@ -189,9 +251,6 @@ export const queueFailedRequest = async (
   body: string | null
 ): Promise<string> => {
   const id = await syncQueue.addToQueue({ url, method, headers, body });
-  
-  // Dispatch custom event for UI updates
   window.dispatchEvent(new CustomEvent('sync-queue-updated'));
-  
   return id;
 };

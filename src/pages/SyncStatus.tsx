@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, RefreshCw, Trash2, Clock, CheckCircle, XCircle, AlertTriangle, Wifi, WifiOff, History } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Trash2, Clock, CheckCircle, XCircle, AlertTriangle, Wifi, WifiOff, History, Timer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -17,10 +17,11 @@ const MAX_RETRIES = 3;
 
 const SyncStatus = () => {
   const navigate = useNavigate();
-  const { isOnline, isSyncing, processQueue } = useBackgroundSync();
+  const { isOnline, isSyncing, nextRetryAt, processQueue } = useBackgroundSync();
   const [requests, setRequests] = useState<QueuedRequest[]>([]);
   const [history, setHistory] = useState<SyncHistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [countdown, setCountdown] = useState<string | null>(null);
 
   const fetchRequests = async () => {
     try {
@@ -57,6 +58,38 @@ const SyncStatus = () => {
       window.removeEventListener('sync-history-updated', handleHistoryUpdate);
     };
   }, []);
+
+  // Countdown timer for next retry
+  useEffect(() => {
+    if (!nextRetryAt) {
+      setCountdown(null);
+      return;
+    }
+
+    const updateCountdown = () => {
+      const now = Date.now();
+      const diff = nextRetryAt.getTime() - now;
+      
+      if (diff <= 0) {
+        setCountdown(null);
+        return;
+      }
+
+      const seconds = Math.ceil(diff / 1000);
+      if (seconds >= 60) {
+        const minutes = Math.floor(seconds / 60);
+        const remainingSeconds = seconds % 60;
+        setCountdown(`${minutes}m ${remainingSeconds}s`);
+      } else {
+        setCountdown(`${seconds}s`);
+      }
+    };
+
+    updateCountdown();
+    const interval = setInterval(updateCountdown, 1000);
+    
+    return () => clearInterval(interval);
+  }, [nextRetryAt]);
 
   const handleRetryAll = async () => {
     triggerHaptic('medium');
@@ -212,6 +245,29 @@ const SyncStatus = () => {
           </TabsList>
 
           <TabsContent value="queue" className="space-y-4">
+            {/* Next Retry Countdown */}
+            {countdown && (
+              <Card className="border-amber-500/50 bg-amber-500/10">
+                <CardContent className="py-3 flex items-center gap-3">
+                  <Timer className="h-5 w-5 text-amber-500" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Auto-retry scheduled</p>
+                    <p className="text-xs text-muted-foreground">
+                      Next attempt in {countdown}
+                    </p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={handleRetryAll}
+                    disabled={!isOnline || isSyncing}
+                  >
+                    Retry Now
+                  </Button>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Actions */}
             <div className="flex gap-2">
               <Button 
