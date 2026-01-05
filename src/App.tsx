@@ -25,8 +25,8 @@ const App = () => (
     <TooltipProvider>
       <Toaster />
       <Sonner />
-      <OfflineIndicator />
       <BrowserRouter>
+        <OfflineIndicator />
         <RouteProgress />
         <ChatbotVisibility />
         <AnimatedRoutes />
