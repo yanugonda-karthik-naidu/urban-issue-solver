@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, RefreshCw, Trash2, Clock, CheckCircle, XCircle, AlertTriangle, Wifi, WifiOff, History, Timer, Settings, X, RotateCcw } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Trash2, Clock, CheckCircle, XCircle, AlertTriangle, Wifi, WifiOff, History, Timer, Settings, X, RotateCcw, Download, FileJson, FileSpreadsheet } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -201,6 +201,57 @@ const SyncStatus = () => {
     setSettings(defaults);
     syncSettings.resetToDefaults();
     toast.success('Settings reset to defaults');
+  };
+
+  // Calculate backoff preview
+  const backoffPreview = useMemo(() => {
+    const delays: string[] = [];
+    for (let i = 0; i < settings.maxRetries; i++) {
+      const delay = Math.min(settings.baseDelayMs * Math.pow(2, i), settings.maxDelayMs);
+      const seconds = Math.round(delay / 1000);
+      if (seconds >= 60) {
+        delays.push(`${Math.floor(seconds / 60)}m ${seconds % 60}s`);
+      } else {
+        delays.push(`${seconds}s`);
+      }
+    }
+    return delays;
+  }, [settings.maxRetries, settings.baseDelayMs, settings.maxDelayMs]);
+
+  // Export history as JSON
+  const handleExportJSON = () => {
+    triggerHaptic('light');
+    const data = JSON.stringify(history, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sync-history-${format(new Date(), 'yyyy-MM-dd-HHmm')}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('History exported as JSON');
+  };
+
+  // Export history as CSV
+  const handleExportCSV = () => {
+    triggerHaptic('light');
+    const headers = ['Timestamp', 'Type', 'Synced Count', 'Failed Count', 'Details'];
+    const rows = history.map(entry => [
+      format(entry.timestamp, 'yyyy-MM-dd HH:mm:ss'),
+      entry.type,
+      entry.syncedCount.toString(),
+      entry.failedCount.toString(),
+      `"${(entry.details || '').replace(/"/g, '""')}"`
+    ]);
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `sync-history-${format(new Date(), 'yyyy-MM-dd-HHmm')}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success('History exported as CSV');
   };
 
   const pendingCount = requests.filter(r => r.retryCount < settings.maxRetries).length;
@@ -423,7 +474,27 @@ const SyncStatus = () => {
 
           <TabsContent value="history" className="space-y-4">
             {/* History Actions */}
-            <div className="flex justify-end">
+            <div className="flex gap-2 justify-end flex-wrap">
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleExportJSON}
+                disabled={history.length === 0}
+                className="gap-2"
+              >
+                <FileJson className="h-4 w-4" />
+                Export JSON
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={handleExportCSV}
+                disabled={history.length === 0}
+                className="gap-2"
+              >
+                <FileSpreadsheet className="h-4 w-4" />
+                Export CSV
+              </Button>
               <Button 
                 variant="outline" 
                 size="sm"
@@ -432,7 +503,7 @@ const SyncStatus = () => {
                 className="gap-2"
               >
                 <Trash2 className="h-4 w-4" />
-                Clear History
+                Clear
               </Button>
             </div>
 
@@ -566,6 +637,26 @@ const SyncStatus = () => {
                   <p className="text-xs text-muted-foreground">
                     Maximum delay between retry attempts (10-300 seconds)
                   </p>
+                </div>
+
+                <Separator />
+
+                {/* Backoff Preview */}
+                <div className="space-y-2">
+                  <Label>Backoff Schedule Preview</Label>
+                  <div className="bg-muted/50 rounded-lg p-3 space-y-1">
+                    {backoffPreview.map((delay, i) => (
+                      <div key={i} className="flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">Attempt {i + 1}:</span>
+                        <Badge variant="outline" className="font-mono text-xs">
+                          {delay}
+                        </Badge>
+                      </div>
+                    ))}
+                    <p className="text-xs text-muted-foreground pt-2 border-t mt-2">
+                      Note: Actual delays include ±25% jitter to prevent thundering herd
+                    </p>
+                  </div>
                 </div>
 
                 <Separator />
