@@ -1,27 +1,30 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, RefreshCw, Trash2, Clock, CheckCircle, XCircle, AlertTriangle, Wifi, WifiOff, History, Timer } from 'lucide-react';
+import { ArrowLeft, RefreshCw, Trash2, Clock, CheckCircle, XCircle, AlertTriangle, Wifi, WifiOff, History, Timer, Settings, X, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Label } from '@/components/ui/label';
+import { Input } from '@/components/ui/input';
+import { Separator } from '@/components/ui/separator';
 import { syncQueue, QueuedRequest } from '@/lib/syncQueue';
 import { syncHistory, SyncHistoryEntry } from '@/lib/syncHistory';
+import { syncSettings, SyncSettings } from '@/lib/syncSettings';
 import { useBackgroundSync } from '@/hooks/useBackgroundSync';
 import { triggerHaptic } from '@/lib/haptics';
 import { toast } from 'sonner';
 import { formatDistanceToNow, format } from 'date-fns';
 
-const MAX_RETRIES = 3;
-
 const SyncStatus = () => {
   const navigate = useNavigate();
-  const { isOnline, isSyncing, nextRetryAt, processQueue } = useBackgroundSync();
+  const { isOnline, isSyncing, nextRetryAt, isAutoRetryEnabled, processQueue, cancelAutoRetry } = useBackgroundSync();
   const [requests, setRequests] = useState<QueuedRequest[]>([]);
   const [history, setHistory] = useState<SyncHistoryEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [countdown, setCountdown] = useState<string | null>(null);
+  const [settings, setSettings] = useState<SyncSettings>(syncSettings.getSettings());
 
   const fetchRequests = async () => {
     try {
@@ -169,7 +172,7 @@ const SyncStatus = () => {
   };
 
   const getRequestStatus = (request: QueuedRequest) => {
-    if (request.retryCount >= MAX_RETRIES) {
+    if (request.retryCount >= settings.maxRetries) {
       return { status: 'failed', color: 'destructive' as const, icon: XCircle };
     }
     if (request.retryCount > 0) {
@@ -186,8 +189,22 @@ const SyncStatus = () => {
     }
   };
 
-  const pendingCount = requests.filter(r => r.retryCount < MAX_RETRIES).length;
-  const failedCount = requests.filter(r => r.retryCount >= MAX_RETRIES).length;
+  const handleSaveSettings = () => {
+    triggerHaptic('light');
+    syncSettings.saveSettings(settings);
+    toast.success('Settings saved');
+  };
+
+  const handleResetSettings = () => {
+    triggerHaptic('light');
+    const defaults = syncSettings.getDefaults();
+    setSettings(defaults);
+    syncSettings.resetToDefaults();
+    toast.success('Settings reset to defaults');
+  };
+
+  const pendingCount = requests.filter(r => r.retryCount < settings.maxRetries).length;
+  const failedCount = requests.filter(r => r.retryCount >= settings.maxRetries).length;
 
   return (
     <div className="min-h-screen bg-background">
@@ -231,22 +248,26 @@ const SyncStatus = () => {
           </Card>
         </div>
 
-        {/* Tabs for Queue and History */}
+        {/* Tabs for Queue, History, and Settings */}
         <Tabs defaultValue="queue" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-2">
+          <TabsList className="grid w-full grid-cols-3">
             <TabsTrigger value="queue" className="gap-2">
               <RefreshCw className="h-4 w-4" />
               Queue {requests.length > 0 && `(${requests.length})`}
             </TabsTrigger>
             <TabsTrigger value="history" className="gap-2">
               <History className="h-4 w-4" />
-              History {history.length > 0 && `(${history.length})`}
+              History
+            </TabsTrigger>
+            <TabsTrigger value="settings" className="gap-2">
+              <Settings className="h-4 w-4" />
+              Settings
             </TabsTrigger>
           </TabsList>
 
           <TabsContent value="queue" className="space-y-4">
             {/* Next Retry Countdown */}
-            {countdown && (
+            {countdown && isAutoRetryEnabled && (
               <Card className="border-amber-500/50 bg-amber-500/10">
                 <CardContent className="py-3 flex items-center gap-3">
                   <Timer className="h-5 w-5 text-amber-500" />
@@ -256,14 +277,40 @@ const SyncStatus = () => {
                       Next attempt in {countdown}
                     </p>
                   </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={handleRetryAll}
-                    disabled={!isOnline || isSyncing}
-                  >
-                    Retry Now
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={cancelAutoRetry}
+                      className="gap-1 text-destructive hover:text-destructive"
+                    >
+                      <X className="h-3 w-3" />
+                      Cancel
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={handleRetryAll}
+                      disabled={!isOnline || isSyncing}
+                    >
+                      Retry Now
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Auto-retry disabled notice */}
+            {!isAutoRetryEnabled && requests.length > 0 && (
+              <Card className="border-muted">
+                <CardContent className="py-3 flex items-center gap-3">
+                  <XCircle className="h-5 w-5 text-muted-foreground" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium">Auto-retry disabled</p>
+                    <p className="text-xs text-muted-foreground">
+                      Click "Retry All" to re-enable automatic retries
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -450,6 +497,88 @@ const SyncStatus = () => {
                     </div>
                   </ScrollArea>
                 )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="settings" className="space-y-4">
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg">Retry Settings</CardTitle>
+                <CardDescription>
+                  Configure automatic retry behavior for failed sync requests
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="maxRetries">Maximum Retry Attempts</Label>
+                  <Input
+                    id="maxRetries"
+                    type="number"
+                    min={1}
+                    max={10}
+                    value={settings.maxRetries}
+                    onChange={(e) => setSettings(prev => ({ 
+                      ...prev, 
+                      maxRetries: Math.max(1, Math.min(10, parseInt(e.target.value) || 1))
+                    }))}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Requests will be discarded after this many failed attempts (1-10)
+                  </p>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-2">
+                  <Label htmlFor="baseDelay">Initial Retry Delay (seconds)</Label>
+                  <Input
+                    id="baseDelay"
+                    type="number"
+                    min={1}
+                    max={60}
+                    value={Math.round(settings.baseDelayMs / 1000)}
+                    onChange={(e) => setSettings(prev => ({ 
+                      ...prev, 
+                      baseDelayMs: Math.max(1000, Math.min(60000, (parseInt(e.target.value) || 1) * 1000))
+                    }))}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Starting delay before first retry, doubles with each attempt (1-60 seconds)
+                  </p>
+                </div>
+
+                <Separator />
+
+                <div className="space-y-2">
+                  <Label htmlFor="maxDelay">Maximum Retry Delay (seconds)</Label>
+                  <Input
+                    id="maxDelay"
+                    type="number"
+                    min={10}
+                    max={300}
+                    value={Math.round(settings.maxDelayMs / 1000)}
+                    onChange={(e) => setSettings(prev => ({ 
+                      ...prev, 
+                      maxDelayMs: Math.max(10000, Math.min(300000, (parseInt(e.target.value) || 10) * 1000))
+                    }))}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Maximum delay between retry attempts (10-300 seconds)
+                  </p>
+                </div>
+
+                <Separator />
+
+                <div className="flex gap-2">
+                  <Button onClick={handleSaveSettings} className="flex-1">
+                    Save Settings
+                  </Button>
+                  <Button variant="outline" onClick={handleResetSettings} className="gap-2">
+                    <RotateCcw className="h-4 w-4" />
+                    Reset
+                  </Button>
+                </div>
               </CardContent>
             </Card>
           </TabsContent>

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { syncQueue, QueuedRequest } from '@/lib/syncQueue';
+import { syncSettings } from '@/lib/syncSettings';
 import { toast } from 'sonner';
 import { triggerHaptic } from '@/lib/haptics';
 import { pushNotifications } from '@/lib/pushNotifications';
@@ -10,16 +11,15 @@ interface BackgroundSyncState {
   queueLength: number;
   lastSyncError: string | null;
   nextRetryAt: Date | null;
+  isAutoRetryEnabled: boolean;
   processQueue: () => Promise<void>;
+  cancelAutoRetry: () => void;
 }
-
-const MAX_RETRIES = 5;
-const BASE_DELAY_MS = 1000; // 1 second
-const MAX_DELAY_MS = 60000; // 1 minute max
 
 // Calculate exponential backoff delay
 const getBackoffDelay = (retryCount: number): number => {
-  const delay = Math.min(BASE_DELAY_MS * Math.pow(2, retryCount), MAX_DELAY_MS);
+  const settings = syncSettings.getSettings();
+  const delay = Math.min(settings.baseDelayMs * Math.pow(2, retryCount), settings.maxDelayMs);
   // Add jitter (±25%) to prevent thundering herd
   const jitter = delay * 0.25 * (Math.random() * 2 - 1);
   return Math.round(delay + jitter);
@@ -31,6 +31,7 @@ export const useBackgroundSync = (): BackgroundSyncState => {
   const [queueLength, setQueueLength] = useState(0);
   const [lastSyncError, setLastSyncError] = useState<string | null>(null);
   const [nextRetryAt, setNextRetryAt] = useState<Date | null>(null);
+  const [isAutoRetryEnabled, setIsAutoRetryEnabled] = useState(true);
   const syncInProgressRef = useRef(false);
   const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -103,6 +104,7 @@ export const useBackgroundSync = (): BackgroundSyncState => {
     syncInProgressRef.current = true;
     setIsSyncing(true);
     setLastSyncError(null);
+    const settings = syncSettings.getSettings();
 
     try {
       const queue = await syncQueue.getQueue();
@@ -120,7 +122,7 @@ export const useBackgroundSync = (): BackgroundSyncState => {
 
       for (const request of queue) {
         // Skip if max retries exceeded
-        if (request.retryCount >= MAX_RETRIES) {
+        if (request.retryCount >= settings.maxRetries) {
           await syncQueue.removeFromQueue(request.id);
           failCount++;
           continue;
@@ -149,10 +151,12 @@ export const useBackgroundSync = (): BackgroundSyncState => {
       if (failCount > 0) {
         setLastSyncError(`${failCount} requests failed to sync`);
         
-        // Schedule automatic retry with exponential backoff
-        if (hasRetryableFailures) {
+        // Schedule automatic retry with exponential backoff (only if enabled)
+        if (hasRetryableFailures && isAutoRetryEnabled) {
           scheduleRetry(maxRetryCount);
           toast.error(`${failCount} requests failed. Retrying automatically...`);
+        } else if (!isAutoRetryEnabled) {
+          toast.error(`${failCount} requests failed. Auto-retry is disabled.`);
         } else {
           await pushNotifications.notifySyncFailed(`${failCount} requests failed to sync`);
         }
@@ -160,16 +164,32 @@ export const useBackgroundSync = (): BackgroundSyncState => {
     } catch (error) {
       console.error('Background sync error:', error);
       setLastSyncError('Sync failed');
-      // Schedule retry on general failure
-      scheduleRetry(0);
+      // Schedule retry on general failure (only if enabled)
+      if (isAutoRetryEnabled) {
+        scheduleRetry(0);
+      }
     } finally {
       setIsSyncing(false);
       syncInProgressRef.current = false;
     }
-  }, [processRequest, updateQueueLength, scheduleRetry]);
+  }, [processRequest, updateQueueLength, scheduleRetry, isAutoRetryEnabled]);
+
+  // Cancel auto-retry function
+  const cancelAutoRetry = useCallback(() => {
+    if (retryTimeoutRef.current) {
+      clearTimeout(retryTimeoutRef.current);
+      retryTimeoutRef.current = null;
+    }
+    setNextRetryAt(null);
+    setIsAutoRetryEnabled(false);
+    triggerHaptic('medium');
+    toast.info('Auto-retry cancelled');
+  }, []);
 
   // Public process queue function
   const processQueue = useCallback(async () => {
+    // Re-enable auto-retry when manually triggered
+    setIsAutoRetryEnabled(true);
     // Clear any pending retry when manually triggered
     if (retryTimeoutRef.current) {
       clearTimeout(retryTimeoutRef.current);
@@ -239,7 +259,9 @@ export const useBackgroundSync = (): BackgroundSyncState => {
     queueLength,
     lastSyncError,
     nextRetryAt,
+    isAutoRetryEnabled,
     processQueue,
+    cancelAutoRetry,
   };
 };
 
