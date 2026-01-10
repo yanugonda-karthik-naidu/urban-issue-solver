@@ -81,8 +81,22 @@ export default function DepartmentIssues() {
       }
       
       if (adminInfo.department_id) {
+        // Fetch department directly if not in cached list
         const dept = getDepartmentById(adminInfo.department_id);
-        setDepartment(dept || null);
+        if (dept) {
+          setDepartment(dept);
+        } else if (departments.length === 0) {
+          // Departments not loaded yet, fetch directly
+          supabase
+            .from('departments')
+            .select('*')
+            .eq('id', adminInfo.department_id)
+            .maybeSingle()
+            .then(({ data }) => {
+              if (data) setDepartment(data as Department);
+            });
+        }
+        
         fetchIssues(adminInfo.department_id);
         fetchWorkers(adminInfo.department_id);
       }
