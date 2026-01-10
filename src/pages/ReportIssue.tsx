@@ -96,11 +96,36 @@ export default function ReportIssue() {
     setLoading(true);
 
     try {
+      // Look up department_id based on category mapping
+      let departmentId: string | null = null;
+      const { data: mappingData } = await supabase
+        .from('category_department_mapping')
+        .select('department_id')
+        .ilike('category', `%${formData.category}%`)
+        .maybeSingle();
+      
+      if (mappingData) {
+        departmentId = mappingData.department_id;
+      } else {
+        // Fallback: try to match by department code directly
+        const categoryCode = formData.category.toLowerCase() as "roads" | "sanitation" | "electricity" | "water" | "traffic" | "municipality" | "other";
+        const { data: deptData } = await supabase
+          .from('departments')
+          .select('id')
+          .eq('code', categoryCode)
+          .maybeSingle();
+        
+        if (deptData) {
+          departmentId = deptData.id;
+        }
+      }
+
       const { data: newIssue, error } = await supabase.from('issues').insert({
         user_id: userId,
         title: formData.title,
         description: formData.description,
         category: formData.category,
+        department_id: departmentId,
         area: formData.area || null,
         district: formData.district || null,
         state: formData.state || null,
