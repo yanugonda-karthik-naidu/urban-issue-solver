@@ -7,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import UserNotificationBell from './UserNotificationBell';
 import { SyncButton } from './SyncButton';
+import { HeaderSyncStatus } from './HeaderSyncStatus';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -66,6 +67,9 @@ export const Header = () => {
 
           {/* Sync button - beside home, only when logged in */}
           {user && <SyncButton />}
+
+          {/* Sync status - beside home, only when logged in */}
+          {user && <HeaderSyncStatus />}
 
           {user && (
             <>
