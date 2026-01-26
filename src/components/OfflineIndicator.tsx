@@ -140,37 +140,6 @@ const OfflineIndicator = () => {
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* Floating Sync FAB */}
-      {!isOnSyncPage && (
-        <motion.button
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 300, damping: 25, delay: 0.5 }}
-          onClick={() => {
-            triggerHaptic('medium');
-            navigate('/sync');
-          }}
-          className={`
-            fixed bottom-20 right-4 z-50 w-12 h-12 rounded-full shadow-lg
-            flex items-center justify-center
-            transition-colors duration-200
-            ${queueLength > 0 
-              ? 'bg-amber-500 hover:bg-amber-600 text-white' 
-              : 'bg-primary hover:bg-primary/90 text-primary-foreground'
-            }
-          `}
-          whileHover={{ scale: 1.1 }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <RefreshCcw className="w-5 h-5" />
-          {queueLength > 0 && (
-            <span className="absolute -top-1 -right-1 bg-destructive text-destructive-foreground text-xs w-5 h-5 rounded-full flex items-center justify-center font-medium">
-              {queueLength > 9 ? '9+' : queueLength}
-            </span>
-          )}
-        </motion.button>
-      )}
     </>
   );
 };
