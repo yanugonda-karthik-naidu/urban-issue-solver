@@ -64,6 +64,9 @@ export const Header = () => {
             {t('nav.home')}
           </Link>
 
+          {/* Sync button - beside home, only when logged in */}
+          {user && <SyncButton />}
+
           {user && (
             <>
               <Link
@@ -96,9 +99,6 @@ export const Header = () => {
               </Link>
             </>
           )}
-
-          {/* Sync button */}
-          {user && <SyncButton />}
 
           {/* Notification bell */}
           {user && <UserNotificationBell />}
