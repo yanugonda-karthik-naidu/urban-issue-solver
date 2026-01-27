@@ -179,8 +179,11 @@ export default function Profile() {
                     type="tel"
                     value={profile.phone || ''}
                     onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                    placeholder="Enter your phone number"
+                    placeholder="+91 98765 43210"
                   />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    Enter with country code (e.g., +91 for India). Used for OTP login.
+                  </p>
                 </div>
 
                 <div>
