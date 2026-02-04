@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Phone, ArrowRight, Loader2 } from 'lucide-react';
+import { Phone, ArrowRight, Loader2, Timer } from 'lucide-react';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
+
+const RESEND_COOLDOWN = 30; // seconds
 
 interface PhoneAuthFormProps {
   onSuccess: () => void;
@@ -17,6 +19,16 @@ export default function PhoneAuthForm({ onSuccess, isAdminLogin }: PhoneAuthForm
   const [otp, setOtp] = useState('');
   const [loading, setLoading] = useState(false);
   const [otpSent, setOtpSent] = useState(false);
+  const [resendTimer, setResendTimer] = useState(0);
+
+  useEffect(() => {
+    if (resendTimer > 0) {
+      const interval = setInterval(() => {
+        setResendTimer((prev) => prev - 1);
+      }, 1000);
+      return () => clearInterval(interval);
+    }
+  }, [resendTimer]);
 
   const formatPhoneNumber = (input: string) => {
     // Remove all non-digit characters except +
@@ -55,6 +67,7 @@ export default function PhoneAuthForm({ onSuccess, isAdminLogin }: PhoneAuthForm
       if (error) throw error;
 
       setOtpSent(true);
+      setResendTimer(RESEND_COOLDOWN);
       toast.success('OTP sent to your phone number');
     } catch (error: any) {
       console.error('OTP send error:', error);
@@ -111,8 +124,15 @@ export default function PhoneAuthForm({ onSuccess, isAdminLogin }: PhoneAuthForm
   };
 
   const handleResendOTP = async () => {
+    if (resendTimer > 0) return;
     setOtp('');
     await handleSendOTP({ preventDefault: () => {} } as React.FormEvent);
+  };
+
+  const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}s`;
   };
 
   if (otpSent) {
@@ -159,6 +179,7 @@ export default function PhoneAuthForm({ onSuccess, isAdminLogin }: PhoneAuthForm
             onClick={() => {
               setOtpSent(false);
               setOtp('');
+              setResendTimer(0);
             }}
             className="text-primary hover:underline"
           >
@@ -167,10 +188,17 @@ export default function PhoneAuthForm({ onSuccess, isAdminLogin }: PhoneAuthForm
           <button
             type="button"
             onClick={handleResendOTP}
-            disabled={loading}
-            className="text-primary hover:underline"
+            disabled={loading || resendTimer > 0}
+            className="text-primary hover:underline disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
           >
-            Resend OTP
+            {resendTimer > 0 ? (
+              <>
+                <Timer className="h-3 w-3" />
+                Resend in {formatTime(resendTimer)}
+              </>
+            ) : (
+              'Resend OTP'
+            )}
           </button>
         </div>
       </form>
