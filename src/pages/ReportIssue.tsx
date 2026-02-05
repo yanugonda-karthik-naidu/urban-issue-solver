@@ -9,18 +9,25 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { MapPin, Upload, X, Camera, Shield } from 'lucide-react';
+import { MapPin, Upload, X, Camera, Shield, Info } from 'lucide-react';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { IssueFormSchema } from '@/lib/validation';
 import { useDuplicateDetection } from '@/hooks/useDuplicateDetection';
 import { DuplicateWarning } from '@/components/DuplicateWarning';
+import { AnonymousReportToggle } from '@/components/verification/AnonymousReportToggle';
+import { VerificationBadge } from '@/components/verification/VerificationBadge';
+import { useUserVerification } from '@/hooks/useUserVerification';
+import { useLegalRules } from '@/hooks/useLegalRules';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Separator } from '@/components/ui/separator';
 
 export default function ReportIssue() {
   const { t } = useTranslation();
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [userId, setUserId] = useState<string | null>(null);
+  const [isAnonymous, setIsAnonymous] = useState(false);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -42,6 +49,10 @@ export default function ReportIssue() {
   const { checking, result: duplicateResult, checkForDuplicates, clearResult } = useDuplicateDetection();
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
   const [bypassDuplicateCheck, setBypassDuplicateCheck] = useState(false);
+  
+  // Verification and legal rules hooks
+  const { verification, isVerified, trustScore } = useUserVerification();
+  const { rules: legalRules } = useLegalRules(formData.category || undefined);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -133,6 +144,7 @@ export default function ReportIssue() {
         longitude: formData.longitude,
         photo_url: uploadedImages[0] || null,
         status: 'pending',
+        is_anonymous: isAnonymous,
       }).select().single();
 
       if (error) throw error;
@@ -325,6 +337,31 @@ export default function ReportIssue() {
             )}
 
             <form onSubmit={handleSubmit} className="space-y-6">
+              {/* Verification Status Banner */}
+              {verification && (
+                <Alert className="bg-muted/50">
+                  <Shield className="h-4 w-4" />
+                  <AlertDescription className="flex items-center justify-between">
+                    <span className="text-sm">
+                      Your verification status: 
+                    </span>
+                    <VerificationBadge 
+                      level={verification.verification_level} 
+                      trustScore={trustScore}
+                      showScore
+                    />
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {/* Anonymous Toggle */}
+              <AnonymousReportToggle 
+                isAnonymous={isAnonymous} 
+                onToggle={setIsAnonymous} 
+              />
+
+              <Separator />
+
               <div>
                 <Label htmlFor="category">{t('report.category')}</Label>
                 <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
@@ -339,6 +376,22 @@ export default function ReportIssue() {
                     <SelectItem value="other">{t('report.categories.other')}</SelectItem>
                   </SelectContent>
                 </Select>
+                
+                {/* Legal Rule Info for Selected Category */}
+                {formData.category && legalRules.length > 0 && (
+                  <div className="mt-2 p-3 bg-primary/5 rounded-lg border border-primary/20">
+                    <p className="text-xs font-medium text-primary flex items-center gap-1">
+                      <Info size={12} />
+                      Applicable Legal Framework
+                    </p>
+                    {legalRules.slice(0, 2).map(rule => (
+                      <p key={rule.id} className="text-xs text-muted-foreground mt-1">
+                        • {rule.act_name} {rule.section_clause && `(${rule.section_clause})`}
+                        {rule.sla_days && ` - SLA: ${rule.sla_days} days`}
+                      </p>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div>

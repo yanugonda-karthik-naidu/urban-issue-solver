@@ -8,3 +8,6 @@ verify_jwt = false
 
 [functions.create-admin-notifications]
 verify_jwt = true
+
+[functions.digilocker-auth]
+verify_jwt = false
