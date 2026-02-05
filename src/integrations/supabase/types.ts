@@ -52,6 +52,48 @@ export type Database = {
           },
         ]
       }
+      audit_logs: {
+        Row: {
+          action_type: string
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          ip_address: string | null
+          justification: string | null
+          new_value: Json | null
+          old_value: Json | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action_type: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          ip_address?: string | null
+          justification?: string | null
+          new_value?: Json | null
+          old_value?: Json | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action_type?: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          ip_address?: string | null
+          justification?: string | null
+          new_value?: Json | null
+          old_value?: Json | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       category_department_mapping: {
         Row: {
           category: string
@@ -152,12 +194,55 @@ export type Database = {
           },
         ]
       }
+      issue_legal_mappings: {
+        Row: {
+          auto_mapped: boolean
+          id: string
+          issue_id: string
+          legal_rule_id: string
+          mapped_at: string
+          mapped_by: string | null
+        }
+        Insert: {
+          auto_mapped?: boolean
+          id?: string
+          issue_id: string
+          legal_rule_id: string
+          mapped_at?: string
+          mapped_by?: string | null
+        }
+        Update: {
+          auto_mapped?: boolean
+          id?: string
+          issue_id?: string
+          legal_rule_id?: string
+          mapped_at?: string
+          mapped_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "issue_legal_mappings_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "issue_legal_mappings_legal_rule_id_fkey"
+            columns: ["legal_rule_id"]
+            isOneToOne: false
+            referencedRelation: "legal_rules"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       issues: {
         Row: {
           admin_remarks: string | null
           area: string | null
           assigned_worker_id: string | null
           category: string
+          compliance_status: string | null
           created_at: string | null
           department_id: string | null
           description: string
@@ -166,22 +251,30 @@ export type Database = {
           escalated_at: string | null
           escalation_level: number | null
           id: string
+          is_anonymous: boolean
           latitude: number | null
+          legal_compliance_deadline: string | null
           longitude: number | null
           photo_url: string | null
+          priority_score: number | null
           resolved_at: string | null
           sla_deadline: string | null
           state: string | null
           status: string | null
           title: string
+          trust_score_at_creation: number | null
           updated_at: string | null
           user_id: string
+          verification_level_at_creation:
+            | Database["public"]["Enums"]["user_verification_level"]
+            | null
         }
         Insert: {
           admin_remarks?: string | null
           area?: string | null
           assigned_worker_id?: string | null
           category: string
+          compliance_status?: string | null
           created_at?: string | null
           department_id?: string | null
           description: string
@@ -190,22 +283,30 @@ export type Database = {
           escalated_at?: string | null
           escalation_level?: number | null
           id?: string
+          is_anonymous?: boolean
           latitude?: number | null
+          legal_compliance_deadline?: string | null
           longitude?: number | null
           photo_url?: string | null
+          priority_score?: number | null
           resolved_at?: string | null
           sla_deadline?: string | null
           state?: string | null
           status?: string | null
           title: string
+          trust_score_at_creation?: number | null
           updated_at?: string | null
           user_id: string
+          verification_level_at_creation?:
+            | Database["public"]["Enums"]["user_verification_level"]
+            | null
         }
         Update: {
           admin_remarks?: string | null
           area?: string | null
           assigned_worker_id?: string | null
           category?: string
+          compliance_status?: string | null
           created_at?: string | null
           department_id?: string | null
           description?: string
@@ -214,16 +315,23 @@ export type Database = {
           escalated_at?: string | null
           escalation_level?: number | null
           id?: string
+          is_anonymous?: boolean
           latitude?: number | null
+          legal_compliance_deadline?: string | null
           longitude?: number | null
           photo_url?: string | null
+          priority_score?: number | null
           resolved_at?: string | null
           sla_deadline?: string | null
           state?: string | null
           status?: string | null
           title?: string
+          trust_score_at_creation?: number | null
           updated_at?: string | null
           user_id?: string
+          verification_level_at_creation?:
+            | Database["public"]["Enums"]["user_verification_level"]
+            | null
         }
         Relationships: [
           {
@@ -241,6 +349,57 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      legal_rules: {
+        Row: {
+          act_name: string
+          category: string
+          city: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          id: string
+          is_active: boolean
+          responsible_authority: string
+          section_clause: string | null
+          sla_days: number | null
+          state: string | null
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          act_name: string
+          category: string
+          city?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          responsible_authority: string
+          section_clause?: string | null
+          sla_days?: number | null
+          state?: string | null
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          act_name?: string
+          category?: string
+          city?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean
+          responsible_authority?: string
+          section_clause?: string | null
+          sla_days?: number | null
+          state?: string | null
+          updated_at?: string
+          version?: number
+        }
+        Relationships: []
       }
       notifications: {
         Row: {
@@ -325,6 +484,60 @@ export type Database = {
         }
         Relationships: []
       }
+      user_verification: {
+        Row: {
+          consent_given: boolean
+          consent_given_at: string | null
+          created_at: string
+          id: string
+          rejected_reports_count: number
+          revoked_at: string | null
+          trust_score: number
+          updated_at: string
+          user_id: string
+          valid_reports_count: number
+          verification_level: Database["public"]["Enums"]["user_verification_level"]
+          verification_metadata: Json | null
+          verification_method: Database["public"]["Enums"]["verification_method"]
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          consent_given?: boolean
+          consent_given_at?: string | null
+          created_at?: string
+          id?: string
+          rejected_reports_count?: number
+          revoked_at?: string | null
+          trust_score?: number
+          updated_at?: string
+          user_id: string
+          valid_reports_count?: number
+          verification_level?: Database["public"]["Enums"]["user_verification_level"]
+          verification_metadata?: Json | null
+          verification_method?: Database["public"]["Enums"]["verification_method"]
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          consent_given?: boolean
+          consent_given_at?: string | null
+          created_at?: string
+          id?: string
+          rejected_reports_count?: number
+          revoked_at?: string | null
+          trust_score?: number
+          updated_at?: string
+          user_id?: string
+          valid_reports_count?: number
+          verification_level?: Database["public"]["Enums"]["user_verification_level"]
+          verification_metadata?: Json | null
+          verification_method?: Database["public"]["Enums"]["verification_method"]
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: []
+      }
       workers: {
         Row: {
           assigned_area: string | null
@@ -375,6 +588,22 @@ export type Database = {
         Args: { check_issue_id: string; check_user_id: string }
         Returns: boolean
       }
+      calculate_issue_priority: {
+        Args: { p_issue_id: string }
+        Returns: number
+      }
+      calculate_trust_score: { Args: { p_user_id: string }; Returns: number }
+      create_audit_log: {
+        Args: {
+          p_action_type: string
+          p_entity_id: string
+          p_entity_type: string
+          p_justification?: string
+          p_new_value?: Json
+          p_old_value?: Json
+        }
+        Returns: string
+      }
       get_admin_department: { Args: { check_user_id: string }; Returns: string }
       is_admin: { Args: { check_user_id: string }; Returns: boolean }
       is_super_admin: { Args: { check_user_id: string }; Returns: boolean }
@@ -389,6 +618,13 @@ export type Database = {
         | "traffic"
         | "municipality"
         | "other"
+      user_verification_level: "unverified" | "verified" | "anonymous"
+      verification_method:
+        | "none"
+        | "digilocker"
+        | "voter_id"
+        | "municipal_id"
+        | "admin_verified"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -525,6 +761,14 @@ export const Constants = {
         "traffic",
         "municipality",
         "other",
+      ],
+      user_verification_level: ["unverified", "verified", "anonymous"],
+      verification_method: [
+        "none",
+        "digilocker",
+        "voter_id",
+        "municipal_id",
+        "admin_verified",
       ],
     },
   },

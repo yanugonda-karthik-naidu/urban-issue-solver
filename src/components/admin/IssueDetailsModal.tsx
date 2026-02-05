@@ -1,7 +1,11 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { MapPin, Calendar, User } from 'lucide-react';
+import { MapPin, Calendar, User, Shield, Scale } from 'lucide-react';
 import { format } from 'date-fns';
+import { VerificationBadge, TrustScoreBadge } from '@/components/verification/VerificationBadge';
+import { LegalReferenceTag } from '@/components/verification/LegalReferenceTag';
+import { ComplianceBadge } from './ComplianceBadge';
+import { Separator } from '@/components/ui/separator';
 
 interface Issue {
   id: string;
@@ -19,6 +23,12 @@ interface Issue {
   admin_remarks: string | null;
   user_name?: string;
   user_email?: string;
+  is_anonymous?: boolean;
+  verification_level_at_creation?: 'unverified' | 'verified' | 'anonymous';
+  trust_score_at_creation?: number;
+  priority_score?: number;
+  legal_compliance_deadline?: string | null;
+  resolved_at?: string | null;
 }
 
 interface IssueDetailsModalProps {
@@ -38,6 +48,50 @@ export default function IssueDetailsModal({ issue, open, onOpenChange }: IssueDe
         </DialogHeader>
 
         <div className="space-y-6">
+          {/* Trust & Verification Section */}
+          <div className="flex flex-wrap items-center gap-3 p-3 bg-muted/50 rounded-lg">
+            <div className="flex items-center gap-2">
+              <Shield className="h-4 w-4 text-muted-foreground" />
+              <span className="text-sm font-medium">Verification:</span>
+              {issue.is_anonymous ? (
+                <Badge variant="secondary">Anonymous</Badge>
+              ) : issue.verification_level_at_creation ? (
+                <VerificationBadge level={issue.verification_level_at_creation} />
+              ) : (
+                <VerificationBadge level="unverified" />
+              )}
+            </div>
+            
+            <Separator orientation="vertical" className="h-6" />
+            
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Trust Score:</span>
+              <TrustScoreBadge score={issue.trust_score_at_creation ?? 50} />
+            </div>
+            
+            <Separator orientation="vertical" className="h-6" />
+            
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium">Priority:</span>
+              <Badge variant="outline">{issue.priority_score ?? 50}/100</Badge>
+            </div>
+
+            {issue.legal_compliance_deadline && (
+              <>
+                <Separator orientation="vertical" className="h-6" />
+                <div className="flex items-center gap-2">
+                  <Scale className="h-4 w-4 text-muted-foreground" />
+                  <span className="text-sm font-medium">Legal SLA:</span>
+                  <ComplianceBadge 
+                    deadline={issue.legal_compliance_deadline}
+                    resolvedAt={issue.resolved_at ?? null}
+                    status={issue.status}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+
           {/* Image */}
           {issue.photo_url && (
             <div className="rounded-lg overflow-hidden">
@@ -83,8 +137,14 @@ export default function IssueDetailsModal({ issue, open, onOpenChange }: IssueDe
                 Reporter
               </p>
               <div>
-                <p className="font-medium">{issue.user_name || 'Unknown'}</p>
-                <p className="text-sm text-muted-foreground">{issue.user_email || 'N/A'}</p>
+                {issue.is_anonymous ? (
+                  <p className="font-medium text-muted-foreground italic">Anonymous Report</p>
+                ) : (
+                  <>
+                    <p className="font-medium">{issue.user_name || 'Unknown'}</p>
+                    <p className="text-sm text-muted-foreground">{issue.user_email || 'N/A'}</p>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -94,6 +154,9 @@ export default function IssueDetailsModal({ issue, open, onOpenChange }: IssueDe
             <p className="text-sm text-muted-foreground">Description</p>
             <p className="text-sm">{issue.description}</p>
           </div>
+
+          {/* Legal Reference */}
+          <LegalReferenceTag issueId={issue.id} />
 
           {/* Location */}
           <div className="space-y-2">

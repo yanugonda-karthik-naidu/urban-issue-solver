@@ -9,6 +9,8 @@ import { toast } from 'sonner';
 import { User, Mail, Phone, MapPin } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ProfileSchema } from '@/lib/validation';
+import { VerificationPanel } from '@/components/verification/VerificationPanel';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 type Profile = {
   id: string;
@@ -134,115 +136,128 @@ export default function Profile() {
               </Avatar>
             </div>
             <CardTitle className="text-3xl">My Profile</CardTitle>
-            <p className="text-muted-foreground">Manage your personal information</p>
+            <p className="text-muted-foreground">Manage your personal information and verification</p>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-6">
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="full_name" className="flex items-center gap-2">
-                    <User className="h-4 w-4" />
-                    Full Name
-                  </Label>
-                  <Input
-                    id="full_name"
-                    value={profile.full_name || ''}
-                    onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
-                    placeholder="Enter your full name"
-                  />
-                </div>
+            <Tabs defaultValue="profile" className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsTrigger value="profile">Personal Info</TabsTrigger>
+                <TabsTrigger value="verification">Identity Verification</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="profile">
+                <form onSubmit={handleSubmit} className="space-y-6">
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="full_name" className="flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        Full Name
+                      </Label>
+                      <Input
+                        id="full_name"
+                        value={profile.full_name || ''}
+                        onChange={(e) => setProfile({ ...profile, full_name: e.target.value })}
+                        placeholder="Enter your full name"
+                      />
+                    </div>
 
-                <div>
-                  <Label htmlFor="email" className="flex items-center gap-2">
-                    <Mail className="h-4 w-4" />
-                    Email
-                  </Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={profile.email || ''}
-                    disabled
-                    className="bg-muted"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Email cannot be changed
-                  </p>
-                </div>
+                    <div>
+                      <Label htmlFor="email" className="flex items-center gap-2">
+                        <Mail className="h-4 w-4" />
+                        Email
+                      </Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={profile.email || ''}
+                        disabled
+                        className="bg-muted"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Email cannot be changed
+                      </p>
+                    </div>
 
-                <div>
-                  <Label htmlFor="phone" className="flex items-center gap-2">
-                    <Phone className="h-4 w-4" />
-                    Phone Number
-                  </Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    value={profile.phone || ''}
-                    onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                    placeholder="+91 98765 43210"
-                  />
-                  <p className="text-xs text-muted-foreground mt-1">
-                    Enter with country code (e.g., +91 for India). Used for OTP login.
-                  </p>
-                </div>
+                    <div>
+                      <Label htmlFor="phone" className="flex items-center gap-2">
+                        <Phone className="h-4 w-4" />
+                        Phone Number
+                      </Label>
+                      <Input
+                        id="phone"
+                        type="tel"
+                        value={profile.phone || ''}
+                        onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
+                        placeholder="+91 98765 43210"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Enter with country code (e.g., +91 for India). Used for OTP login.
+                      </p>
+                    </div>
 
-                <div>
-                  <Label htmlFor="address" className="flex items-center gap-2">
-                    <MapPin className="h-4 w-4" />
-                    Address
-                  </Label>
-                  <Input
-                    id="address"
-                    value={profile.address || ''}
-                    onChange={(e) => setProfile({ ...profile, address: e.target.value })}
-                    placeholder="Enter your address"
-                  />
-                </div>
+                    <div>
+                      <Label htmlFor="address" className="flex items-center gap-2">
+                        <MapPin className="h-4 w-4" />
+                        Address
+                      </Label>
+                      <Input
+                        id="address"
+                        value={profile.address || ''}
+                        onChange={(e) => setProfile({ ...profile, address: e.target.value })}
+                        placeholder="Enter your address"
+                      />
+                    </div>
 
-                <div className="grid grid-cols-3 gap-4">
-                  <div>
-                    <Label htmlFor="area">Area</Label>
-                    <Input
-                      id="area"
-                      value={profile.area || ''}
-                      onChange={(e) => setProfile({ ...profile, area: e.target.value })}
-                      placeholder="Area"
-                    />
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <Label htmlFor="area">Area</Label>
+                        <Input
+                          id="area"
+                          value={profile.area || ''}
+                          onChange={(e) => setProfile({ ...profile, area: e.target.value })}
+                          placeholder="Area"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="district">District</Label>
+                        <Input
+                          id="district"
+                          value={profile.district || ''}
+                          onChange={(e) => setProfile({ ...profile, district: e.target.value })}
+                          placeholder="District"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor="state">State</Label>
+                        <Input
+                          id="state"
+                          value={profile.state || ''}
+                          onChange={(e) => setProfile({ ...profile, state: e.target.value })}
+                          placeholder="State"
+                        />
+                      </div>
+                    </div>
                   </div>
-                  <div>
-                    <Label htmlFor="district">District</Label>
-                    <Input
-                      id="district"
-                      value={profile.district || ''}
-                      onChange={(e) => setProfile({ ...profile, district: e.target.value })}
-                      placeholder="District"
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="state">State</Label>
-                    <Input
-                      id="state"
-                      value={profile.state || ''}
-                      onChange={(e) => setProfile({ ...profile, state: e.target.value })}
-                      placeholder="State"
-                    />
-                  </div>
-                </div>
-              </div>
 
-              <div className="flex gap-4">
-                <Button type="submit" className="flex-1" disabled={loading}>
-                  {loading ? 'Saving...' : 'Save Changes'}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => navigate('/dashboard')}
-                >
-                  Cancel
-                </Button>
-              </div>
-            </form>
+                  <div className="flex gap-4">
+                    <Button type="submit" className="flex-1" disabled={loading}>
+                      {loading ? 'Saving...' : 'Save Changes'}
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => navigate('/dashboard')}
+                    >
+                      Cancel
+                    </Button>
+                  </div>
+                </form>
+              </TabsContent>
+              
+              <TabsContent value="verification">
+                <VerificationPanel />
+              </TabsContent>
+            </Tabs>
           </CardContent>
         </Card>
       </div>
