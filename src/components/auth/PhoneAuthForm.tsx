@@ -224,6 +224,11 @@ export default function PhoneAuthForm({ onSuccess, isAdminLogin }: PhoneAuthForm
         <p className="mt-1 text-xs text-muted-foreground">
           Enter with country code (e.g., +91 for India)
         </p>
+        <div className="mt-3 p-3 bg-muted border border-border rounded-lg">
+          <p className="text-xs text-muted-foreground">
+            <strong>Note:</strong> Phone OTP requires an SMS provider (like Twilio) to be configured by the administrator. If you don't receive an OTP, please use email login instead.
+          </p>
+        </div>
       </div>
       
       <Button type="submit" variant="hero" className="w-full" disabled={loading}>
