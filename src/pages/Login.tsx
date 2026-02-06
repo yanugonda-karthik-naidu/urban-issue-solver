@@ -7,10 +7,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Mail, Lock, Shield, Phone, KeyRound } from 'lucide-react';
+import { Lock, Shield, Phone, Mail, KeyRound } from 'lucide-react';
 import PhoneAuthForm from '@/components/auth/PhoneAuthForm';
 import EmailAuthForm from '@/components/auth/EmailAuthForm';
+import SignupForm from '@/components/auth/SignupForm';
 import ForgotPasswordForm from '@/components/auth/ForgotPasswordForm';
+
+type AuthView = 'login' | 'signup' | 'forgot';
 
 export default function Login() {
   const { t } = useTranslation();
@@ -18,14 +21,13 @@ export default function Login() {
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
   const [isAdminLogin, setIsAdminLogin] = useState(false);
-  const [authMethod, setAuthMethod] = useState<'phone' | 'email'>('phone');
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [authMethod, setAuthMethod] = useState<'phone' | 'email'>('email');
+  const [authView, setAuthView] = useState<AuthView>('login');
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
   useEffect(() => {
-    // Check if coming from password reset link
     if (searchParams.get('reset') === 'true') {
       setShowResetPassword(true);
       setAuthMethod('email');
@@ -33,17 +35,12 @@ export default function Login() {
 
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (session) {
-        // If reset mode, don't redirect
-        if (searchParams.get('reset') === 'true') {
-          return;
-        }
+        if (searchParams.get('reset') === 'true') return;
         
-        // Check if user is admin
         const { data: isAdminResult } = await supabase.rpc('is_admin', { 
           check_user_id: session.user.id 
         });
         
-        // Navigate based on role
         if (isAdminResult) {
           navigate('/admin');
         } else {
@@ -67,7 +64,6 @@ export default function Login() {
       }
     }
   };
-
 
   const handlePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -158,6 +154,14 @@ export default function Login() {
     );
   }
 
+  const getHeaderText = () => {
+    if (authView === 'signup') return { title: 'Create Account', desc: 'Sign up to get started with CivicReport' };
+    if (authView === 'forgot') return { title: 'Reset Password', desc: 'We\'ll help you get back in' };
+    return { title: t('auth.welcome'), desc: t('auth.getStarted') };
+  };
+
+  const header = getHeaderText();
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-card p-4">
       <Card className="w-full max-w-md shadow-strong">
@@ -165,12 +169,14 @@ export default function Login() {
           <div className="mx-auto mb-4 h-16 w-16 rounded-xl bg-gradient-hero flex items-center justify-center">
             <div className="h-10 w-10 rounded-lg bg-background/20" />
           </div>
-          <CardTitle className="text-2xl">{t('auth.welcome')}</CardTitle>
-          <CardDescription>{t('auth.getStarted')}</CardDescription>
+          <CardTitle className="text-2xl">{header.title}</CardTitle>
+          <CardDescription>{header.desc}</CardDescription>
         </CardHeader>
         <CardContent>
-          {showForgotPassword ? (
-            <ForgotPasswordForm onBack={() => setShowForgotPassword(false)} />
+          {authView === 'forgot' ? (
+            <ForgotPasswordForm onBack={() => setAuthView('login')} />
+          ) : authView === 'signup' ? (
+            <SignupForm onSwitchToLogin={() => setAuthView('login')} />
           ) : (
             <>
               {/* Admin Login Toggle */}
@@ -198,15 +204,6 @@ export default function Login() {
               {/* Auth Method Toggle */}
               <div className="flex gap-2 mb-6">
                 <Button
-                  variant={authMethod === 'phone' ? 'default' : 'outline'}
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => setAuthMethod('phone')}
-                >
-                  <Phone className="mr-2 h-4 w-4" />
-                  Phone
-                </Button>
-                <Button
                   variant={authMethod === 'email' ? 'default' : 'outline'}
                   size="sm"
                   className="flex-1"
@@ -215,23 +212,36 @@ export default function Login() {
                   <Mail className="mr-2 h-4 w-4" />
                   Email
                 </Button>
+                <Button
+                  variant={authMethod === 'phone' ? 'default' : 'outline'}
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => setAuthMethod('phone')}
+                >
+                  <Phone className="mr-2 h-4 w-4" />
+                  Phone
+                </Button>
               </div>
 
               {authMethod === 'phone' ? (
                 <PhoneAuthForm onSuccess={handleAuthSuccess} isAdminLogin={isAdminLogin} />
               ) : (
                 <>
-                  <EmailAuthForm onSuccess={handleAuthSuccess} isAdminLogin={isAdminLogin} />
+                  <EmailAuthForm
+                    onSuccess={handleAuthSuccess}
+                    isAdminLogin={isAdminLogin}
+                    onSwitchToSignup={() => setAuthView('signup')}
+                  />
                   <button
                     type="button"
-                    onClick={() => setShowForgotPassword(true)}
+                    onClick={() => setAuthView('forgot')}
                     className="w-full mt-4 text-sm text-primary hover:underline"
                   >
                     Forgot password?
                   </button>
                 </>
               )}
-              
+
               <p className="mt-4 text-center text-sm text-muted-foreground">
                 By continuing, you agree to our Terms of Service and Privacy Policy
               </p>

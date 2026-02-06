@@ -1,89 +1,49 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Mail, ArrowRight, Loader2, Timer } from 'lucide-react';
-import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
-
-const RESEND_COOLDOWN = 30; // seconds
+import { Mail, Lock, ArrowRight, Loader2, Eye, EyeOff } from 'lucide-react';
 
 interface EmailAuthFormProps {
   onSuccess: () => void;
   isAdminLogin?: boolean;
+  onSwitchToSignup: () => void;
 }
 
-export default function EmailAuthForm({ onSuccess, isAdminLogin }: EmailAuthFormProps) {
+export default function EmailAuthForm({ onSuccess, isAdminLogin, onSwitchToSignup }: EmailAuthFormProps) {
   const [email, setEmail] = useState('');
-  const [otp, setOtp] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
-  const [resendTimer, setResendTimer] = useState(0);
+  const [showPassword, setShowPassword] = useState(false);
 
-  useEffect(() => {
-    if (resendTimer > 0) {
-      const interval = setInterval(() => {
-        setResendTimer((prev) => prev - 1);
-      }, 1000);
-      return () => clearInterval(interval);
-    }
-  }, [resendTimer]);
-
-  const handleSendOTP = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!email || !email.includes('@')) {
       toast.error('Please enter a valid email address');
       return;
     }
 
-    setLoading(true);
-
-    try {
-      const { error } = await supabase.auth.signInWithOtp({
-        email: email.trim(),
-        options: {
-          shouldCreateUser: true,
-        },
-      });
-
-      if (error) throw error;
-
-      setOtpSent(true);
-      setResendTimer(RESEND_COOLDOWN);
-      toast.success('OTP sent to your email address');
-    } catch (error: any) {
-      console.error('OTP send error:', error);
-      toast.error(error.message || 'Failed to send OTP');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyOTP = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!otp || otp.length !== 6) {
-      toast.error('Please enter the 6-digit OTP');
+    if (!password) {
+      toast.error('Please enter your password');
       return;
     }
 
     setLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.verifyOtp({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: email.trim(),
-        token: otp,
-        type: 'email',
+        password,
       });
 
       if (error) throw error;
 
       if (isAdminLogin && data.user) {
-        // Check if user is admin for admin login mode
-        const { data: isAdminResult, error: adminError } = await supabase.rpc('is_admin', { 
-          check_user_id: data.user.id 
+        const { data: isAdminResult, error: adminError } = await supabase.rpc('is_admin', {
+          check_user_id: data.user.id,
         });
 
         if (adminError) throw adminError;
@@ -98,103 +58,27 @@ export default function EmailAuthForm({ onSuccess, isAdminLogin }: EmailAuthForm
       toast.success('Successfully signed in!');
       onSuccess();
     } catch (error: any) {
-      console.error('OTP verification error:', error);
-      toast.error(error.message || 'Failed to verify OTP');
+      console.error('Login error:', error);
+      if (error.message?.includes('Invalid login credentials')) {
+        toast.error('Invalid email or password. Please try again.');
+      } else if (error.message?.includes('Email not confirmed')) {
+        toast.error('Please verify your email before signing in. Check your inbox.');
+      } else {
+        toast.error(error.message || 'Failed to sign in');
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleResendOTP = async () => {
-    if (resendTimer > 0) return;
-    setOtp('');
-    await handleSendOTP({ preventDefault: () => {} } as React.FormEvent);
-  };
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}s`;
-  };
-
-  if (otpSent) {
-    return (
-      <form onSubmit={handleVerifyOTP} className="space-y-4">
-        <div className="text-center mb-4">
-          <p className="text-sm text-muted-foreground">
-            Enter the 6-digit code sent to
-          </p>
-          <p className="font-medium">{email}</p>
-        </div>
-        
-        <div className="flex justify-center">
-          <InputOTP
-            value={otp}
-            onChange={setOtp}
-            maxLength={6}
-          >
-            <InputOTPGroup>
-              <InputOTPSlot index={0} />
-              <InputOTPSlot index={1} />
-              <InputOTPSlot index={2} />
-              <InputOTPSlot index={3} />
-              <InputOTPSlot index={4} />
-              <InputOTPSlot index={5} />
-            </InputOTPGroup>
-          </InputOTP>
-        </div>
-
-        <Button type="submit" variant="hero" className="w-full" disabled={loading || otp.length !== 6}>
-          {loading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Verifying...
-            </>
-          ) : (
-            'Verify OTP'
-          )}
-        </Button>
-
-        <div className="flex items-center justify-between text-sm">
-          <button
-            type="button"
-            onClick={() => {
-              setOtpSent(false);
-              setOtp('');
-              setResendTimer(0);
-            }}
-            className="text-primary hover:underline"
-          >
-            Change email
-          </button>
-          <button
-            type="button"
-            onClick={handleResendOTP}
-            disabled={loading || resendTimer > 0}
-            className="text-primary hover:underline disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-          >
-            {resendTimer > 0 ? (
-              <>
-                <Timer className="h-3 w-3" />
-                Resend in {formatTime(resendTimer)}
-              </>
-            ) : (
-              'Resend OTP'
-            )}
-          </button>
-        </div>
-      </form>
-    );
-  }
-
   return (
-    <form onSubmit={handleSendOTP} className="space-y-4">
+    <form onSubmit={handleLogin} className="space-y-4">
       <div>
-        <Label htmlFor="email">Email Address</Label>
+        <Label htmlFor="login-email">Email Address</Label>
         <div className="relative">
           <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
-            id="email"
+            id="login-email"
             type="email"
             placeholder="your@email.com"
             value={email}
@@ -203,24 +87,61 @@ export default function EmailAuthForm({ onSuccess, isAdminLogin }: EmailAuthForm
             required
           />
         </div>
-        <p className="mt-1 text-xs text-muted-foreground">
-          We'll send a 6-digit verification code to this email
-        </p>
       </div>
-      
+
+      <div>
+        <Label htmlFor="login-password">Password</Label>
+        <div className="relative">
+          <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            id="login-password"
+            type={showPassword ? 'text' : 'password'}
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="pl-10 pr-10"
+            required
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
+        </div>
+      </div>
+
       <Button type="submit" variant="hero" className="w-full" disabled={loading}>
         {loading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Sending OTP...
+            Signing in...
           </>
         ) : (
           <>
-            Send OTP
+            Sign In
             <ArrowRight className="ml-2 h-4 w-4" />
           </>
         )}
       </Button>
+
+      <div className="relative my-2">
+        <div className="absolute inset-0 flex items-center">
+          <span className="w-full border-t border-border" />
+        </div>
+      </div>
+
+      <p className="text-center text-sm text-muted-foreground">
+        Don't have an account?{' '}
+        <button
+          type="button"
+          onClick={onSwitchToSignup}
+          className="font-medium text-primary hover:underline"
+        >
+          Create an account
+        </button>
+      </p>
     </form>
   );
 }
