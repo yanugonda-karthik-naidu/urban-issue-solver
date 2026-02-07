@@ -319,7 +319,16 @@ export default function Login() {
                 </div>
 
                 {authMethod === 'phone' ? (
-                  <PhoneAuthForm onSuccess={handleAuthSuccess} />
+                  <>
+                    <PhoneAuthForm onSuccess={handleAuthSuccess} onSwitchToSignup={() => setAuthView('signup')} />
+                    <button
+                      type="button"
+                      onClick={() => setAuthView('forgot')}
+                      className="w-full text-sm text-primary hover:underline"
+                    >
+                      Forgot password?
+                    </button>
+                  </>
                 ) : (
                   <>
                     <EmailAuthForm
