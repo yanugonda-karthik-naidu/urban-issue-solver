@@ -1,87 +1,44 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
-import { Phone, ArrowRight, Loader2, Timer } from 'lucide-react';
-import { InputOTP, InputOTPGroup, InputOTPSlot } from '@/components/ui/input-otp';
-
-const RESEND_COOLDOWN = 30; // seconds
+import { Phone, Lock, ArrowRight, Loader2, Eye, EyeOff } from 'lucide-react';
 
 interface PhoneAuthFormProps {
   onSuccess: () => void;
-  isAdminLogin?: boolean;
+  onSwitchToSignup: () => void;
 }
 
-export default function PhoneAuthForm({ onSuccess, isAdminLogin }: PhoneAuthFormProps) {
+const formatPhoneNumber = (input: string) => {
+  let cleaned = input.replace(/[^\d+]/g, '');
+  if (!cleaned.startsWith('+')) {
+    if (cleaned.length === 10) {
+      cleaned = '+91' + cleaned;
+    } else {
+      cleaned = '+' + cleaned;
+    }
+  }
+  return cleaned;
+};
+
+export default function PhoneAuthForm({ onSuccess, onSwitchToSignup }: PhoneAuthFormProps) {
   const [phone, setPhone] = useState('');
-  const [otp, setOtp] = useState('');
+  const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  const [otpSent, setOtpSent] = useState(false);
-  const [resendTimer, setResendTimer] = useState(0);
+  const [showPassword, setShowPassword] = useState(false);
 
-  useEffect(() => {
-    if (resendTimer > 0) {
-      const interval = setInterval(() => {
-        setResendTimer((prev) => prev - 1);
-      }, 1000);
-      return () => clearInterval(interval);
-    }
-  }, [resendTimer]);
-
-  const formatPhoneNumber = (input: string) => {
-    // Remove all non-digit characters except +
-    let cleaned = input.replace(/[^\d+]/g, '');
-    
-    // Ensure it starts with + for international format
-    if (!cleaned.startsWith('+')) {
-      // Default to India country code if no country code provided
-      if (cleaned.length === 10) {
-        cleaned = '+91' + cleaned;
-      } else {
-        cleaned = '+' + cleaned;
-      }
-    }
-    
-    return cleaned;
-  };
-
-  const handleSendOTP = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    if (!phone || phone.length < 10) {
+
+    if (!phone || phone.replace(/\D/g, '').length < 10) {
       toast.error('Please enter a valid phone number');
       return;
     }
 
-    setLoading(true);
-
-    try {
-      const formattedPhone = formatPhoneNumber(phone);
-      
-      const { error } = await supabase.auth.signInWithOtp({
-        phone: formattedPhone,
-      });
-
-      if (error) throw error;
-
-      setOtpSent(true);
-      setResendTimer(RESEND_COOLDOWN);
-      toast.success('OTP sent to your phone number');
-    } catch (error: any) {
-      console.error('OTP send error:', error);
-      toast.error(error.message || 'Failed to send OTP');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleVerifyOTP = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!otp || otp.length !== 6) {
-      toast.error('Please enter the 6-digit OTP');
+    if (!password) {
+      toast.error('Please enter your password');
       return;
     }
 
@@ -89,130 +46,38 @@ export default function PhoneAuthForm({ onSuccess, isAdminLogin }: PhoneAuthForm
 
     try {
       const formattedPhone = formatPhoneNumber(phone);
-      
-      const { data, error } = await supabase.auth.verifyOtp({
+
+      const { data, error } = await supabase.auth.signInWithPassword({
         phone: formattedPhone,
-        token: otp,
-        type: 'sms',
+        password,
       });
 
       if (error) throw error;
 
-      if (isAdminLogin && data.user) {
-        // Check if user is admin for admin login mode
-        const { data: isAdminResult, error: adminError } = await supabase.rpc('is_admin', { 
-          check_user_id: data.user.id 
-        });
-
-        if (adminError) throw adminError;
-
-        if (!isAdminResult) {
-          toast.error('Access denied. Admin privileges required.');
-          await supabase.auth.signOut();
-          return;
-        }
-      }
-
       toast.success('Successfully signed in!');
       onSuccess();
     } catch (error: any) {
-      console.error('OTP verification error:', error);
-      toast.error(error.message || 'Failed to verify OTP');
+      console.error('Login error:', error);
+      if (error.message?.includes('Invalid login credentials')) {
+        toast.error('Invalid phone number or password. Please try again.');
+      } else if (error.message?.includes('not confirmed')) {
+        toast.error('Please verify your phone number before signing in.');
+      } else {
+        toast.error(error.message || 'Failed to sign in');
+      }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleResendOTP = async () => {
-    if (resendTimer > 0) return;
-    setOtp('');
-    await handleSendOTP({ preventDefault: () => {} } as React.FormEvent);
-  };
-
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return mins > 0 ? `${mins}:${secs.toString().padStart(2, '0')}` : `${secs}s`;
-  };
-
-  if (otpSent) {
-    return (
-      <form onSubmit={handleVerifyOTP} className="space-y-4">
-        <div className="text-center mb-4">
-          <p className="text-sm text-muted-foreground">
-            Enter the 6-digit code sent to
-          </p>
-          <p className="font-medium">{formatPhoneNumber(phone)}</p>
-        </div>
-        
-        <div className="flex justify-center">
-          <InputOTP
-            value={otp}
-            onChange={setOtp}
-            maxLength={6}
-          >
-            <InputOTPGroup>
-              <InputOTPSlot index={0} />
-              <InputOTPSlot index={1} />
-              <InputOTPSlot index={2} />
-              <InputOTPSlot index={3} />
-              <InputOTPSlot index={4} />
-              <InputOTPSlot index={5} />
-            </InputOTPGroup>
-          </InputOTP>
-        </div>
-
-        <Button type="submit" variant="hero" className="w-full" disabled={loading || otp.length !== 6}>
-          {loading ? (
-            <>
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-              Verifying...
-            </>
-          ) : (
-            'Verify OTP'
-          )}
-        </Button>
-
-        <div className="flex items-center justify-between text-sm">
-          <button
-            type="button"
-            onClick={() => {
-              setOtpSent(false);
-              setOtp('');
-              setResendTimer(0);
-            }}
-            className="text-primary hover:underline"
-          >
-            Change number
-          </button>
-          <button
-            type="button"
-            onClick={handleResendOTP}
-            disabled={loading || resendTimer > 0}
-            className="text-primary hover:underline disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-          >
-            {resendTimer > 0 ? (
-              <>
-                <Timer className="h-3 w-3" />
-                Resend in {formatTime(resendTimer)}
-              </>
-            ) : (
-              'Resend OTP'
-            )}
-          </button>
-        </div>
-      </form>
-    );
-  }
-
   return (
-    <form onSubmit={handleSendOTP} className="space-y-4">
+    <form onSubmit={handleLogin} className="space-y-4">
       <div>
-        <Label htmlFor="phone">Phone Number</Label>
+        <Label htmlFor="login-phone">Phone Number</Label>
         <div className="relative">
           <Phone className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
           <Input
-            id="phone"
+            id="login-phone"
             type="tel"
             placeholder="+91 98765 43210"
             value={phone}
@@ -224,26 +89,55 @@ export default function PhoneAuthForm({ onSuccess, isAdminLogin }: PhoneAuthForm
         <p className="mt-1 text-xs text-muted-foreground">
           Enter with country code (e.g., +91 for India)
         </p>
-        <div className="mt-3 p-3 bg-muted border border-border rounded-lg">
-          <p className="text-xs text-muted-foreground">
-            <strong>Note:</strong> Phone OTP requires an SMS provider (like Twilio) to be configured by the administrator. If you don't receive an OTP, please use email login instead.
-          </p>
+      </div>
+
+      <div>
+        <Label htmlFor="login-phone-password">Password</Label>
+        <div className="relative">
+          <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+          <Input
+            id="login-phone-password"
+            type={showPassword ? 'text' : 'password'}
+            placeholder="••••••••"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            className="pl-10 pr-10"
+            required
+          />
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 top-3 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+          </button>
         </div>
       </div>
-      
+
       <Button type="submit" variant="hero" className="w-full" disabled={loading}>
         {loading ? (
           <>
             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            Sending OTP...
+            Signing in...
           </>
         ) : (
           <>
-            Send OTP
+            Sign In
             <ArrowRight className="ml-2 h-4 w-4" />
           </>
         )}
       </Button>
+
+      <p className="text-center text-sm text-muted-foreground">
+        Don't have an account?{' '}
+        <button
+          type="button"
+          onClick={onSwitchToSignup}
+          className="font-medium text-primary hover:underline"
+        >
+          Create an account
+        </button>
+      </p>
     </form>
   );
 }
