@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card } from '@/components/ui/card';
 import { toast } from 'sonner';
-import { Lock, Shield, Phone, Mail, KeyRound, MapPin, BarChart3, Users, CheckCircle } from 'lucide-react';
+import { Lock, Phone, Mail, KeyRound, MapPin, BarChart3, Users, CheckCircle } from 'lucide-react';
 import PhoneAuthForm from '@/components/auth/PhoneAuthForm';
 import EmailAuthForm from '@/components/auth/EmailAuthForm';
 import SignupForm from '@/components/auth/SignupForm';
@@ -21,8 +21,7 @@ export default function Login() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [loading, setLoading] = useState(false);
-  const [isAdminLogin, setIsAdminLogin] = useState(false);
-  const [authMethod, setAuthMethod] = useState<'phone' | 'email'>('email');
+  const [authMethod, setAuthMethod] = useState<'phone' | 'email'>('phone');
   const [authView, setAuthView] = useState<AuthView>('login');
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [newPassword, setNewPassword] = useState('');
@@ -297,29 +296,6 @@ export default function Login() {
                   </div>
                 </div>
 
-                {/* Admin Login Toggle */}
-                <div className="p-3 bg-muted/50 rounded-lg border border-border">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <Shield className="h-4 w-4 text-primary" />
-                      <span className="text-sm font-medium">Admin Mode</span>
-                    </div>
-                    <Button
-                      variant={isAdminLogin ? "default" : "outline"}
-                      size="sm"
-                      className="h-7 text-xs"
-                      onClick={() => setIsAdminLogin(!isAdminLogin)}
-                    >
-                      {isAdminLogin ? 'Enabled' : 'Disabled'}
-                    </Button>
-                  </div>
-                  {isAdminLogin && (
-                    <p className="mt-2 text-xs text-muted-foreground">
-                      Only authorized administrators can access.
-                    </p>
-                  )}
-                </div>
-
                 {/* Auth Method Toggle */}
                 <div className="flex gap-2">
                   <Button
@@ -343,12 +319,11 @@ export default function Login() {
                 </div>
 
                 {authMethod === 'phone' ? (
-                  <PhoneAuthForm onSuccess={handleAuthSuccess} isAdminLogin={isAdminLogin} />
+                  <PhoneAuthForm onSuccess={handleAuthSuccess} />
                 ) : (
                   <>
                     <EmailAuthForm
                       onSuccess={handleAuthSuccess}
-                      isAdminLogin={isAdminLogin}
                       onSwitchToSignup={() => setAuthView('signup')}
                     />
                     <button
