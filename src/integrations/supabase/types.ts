@@ -239,6 +239,9 @@ export type Database = {
       issues: {
         Row: {
           admin_remarks: string | null
+          ai_severity_level: string | null
+          ai_severity_reasoning: string | null
+          ai_severity_score: number | null
           area: string | null
           assigned_worker_id: string | null
           category: string
@@ -251,10 +254,15 @@ export type Database = {
           escalated_at: string | null
           escalation_level: number | null
           id: string
+          image_validation_confidence: number | null
+          image_validation_reasoning: string | null
+          image_validation_status: string | null
           is_anonymous: boolean
           latitude: number | null
           legal_compliance_deadline: string | null
+          location_sensitivity_zone: string | null
           longitude: number | null
+          nearby_reports_count: number | null
           photo_url: string | null
           priority_score: number | null
           resolved_at: string | null
@@ -271,6 +279,9 @@ export type Database = {
         }
         Insert: {
           admin_remarks?: string | null
+          ai_severity_level?: string | null
+          ai_severity_reasoning?: string | null
+          ai_severity_score?: number | null
           area?: string | null
           assigned_worker_id?: string | null
           category: string
@@ -283,10 +294,15 @@ export type Database = {
           escalated_at?: string | null
           escalation_level?: number | null
           id?: string
+          image_validation_confidence?: number | null
+          image_validation_reasoning?: string | null
+          image_validation_status?: string | null
           is_anonymous?: boolean
           latitude?: number | null
           legal_compliance_deadline?: string | null
+          location_sensitivity_zone?: string | null
           longitude?: number | null
+          nearby_reports_count?: number | null
           photo_url?: string | null
           priority_score?: number | null
           resolved_at?: string | null
@@ -303,6 +319,9 @@ export type Database = {
         }
         Update: {
           admin_remarks?: string | null
+          ai_severity_level?: string | null
+          ai_severity_reasoning?: string | null
+          ai_severity_score?: number | null
           area?: string | null
           assigned_worker_id?: string | null
           category?: string
@@ -315,10 +334,15 @@ export type Database = {
           escalated_at?: string | null
           escalation_level?: number | null
           id?: string
+          image_validation_confidence?: number | null
+          image_validation_reasoning?: string | null
+          image_validation_status?: string | null
           is_anonymous?: boolean
           latitude?: number | null
           legal_compliance_deadline?: string | null
+          location_sensitivity_zone?: string | null
           longitude?: number | null
+          nearby_reports_count?: number | null
           photo_url?: string | null
           priority_score?: number | null
           resolved_at?: string | null
@@ -593,6 +617,15 @@ export type Database = {
         Returns: number
       }
       calculate_trust_score: { Args: { p_user_id: string }; Returns: number }
+      count_nearby_reports: {
+        Args: {
+          p_area: string
+          p_category: string
+          p_district: string
+          p_issue_id: string
+        }
+        Returns: number
+      }
       create_audit_log: {
         Args: {
           p_action_type: string

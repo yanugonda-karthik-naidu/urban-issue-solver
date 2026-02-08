@@ -11,3 +11,6 @@ verify_jwt = true
 
 [functions.digilocker-auth]
 verify_jwt = false
+
+[functions.calculate-severity]
+verify_jwt = false

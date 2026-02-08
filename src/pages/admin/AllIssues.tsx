@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { AlertCircle, CheckCircle2, Clock, MapPin, Search, ArrowUpCircle, List, Map } from 'lucide-react';
+import { AlertCircle, CheckCircle2, Clock, MapPin, Search, ArrowUpCircle, List, Map, Brain, RefreshCw } from 'lucide-react';
 import { toast } from 'sonner';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
@@ -17,9 +17,11 @@ import IssuesMap from '@/components/admin/IssuesMap';
 import { SLABadge } from '@/components/admin/SLABadge';
 import { DepartmentBadge } from '@/components/admin/DepartmentBadge';
 import { EscalationBadge } from '@/components/admin/EscalationBadge';
+import { SeverityBadge } from '@/components/admin/SeverityBadge';
 import { DepartmentFilter } from '@/components/admin/DepartmentFilter';
 import { useDepartments } from '@/hooks/useDepartments';
 import { useAdminAccess } from '@/hooks/useAdminAccess';
+import { useSeverityScoring } from '@/hooks/useSeverityScoring';
 import { AdminRemarksSchema } from '@/lib/validation';
 
 interface Worker {
@@ -49,6 +51,9 @@ interface Issue {
   resolved_at: string | null;
   assigned_worker_id: string | null;
   workers?: Worker | null;
+  ai_severity_score: number | null;
+  ai_severity_level: string | null;
+  ai_severity_reasoning: string | null;
 }
 
 interface UserProfile {
@@ -65,6 +70,8 @@ export default function AllIssues() {
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [departmentFilter, setDepartmentFilter] = useState<string>('all');
   const [escalationFilter, setEscalationFilter] = useState<string>('all');
+  const [severityFilter, setSeverityFilter] = useState<string>('all');
+  const [sortBy, setSortBy] = useState<string>('date');
   const [searchQuery, setSearchQuery] = useState('');
   const [editingRemarks, setEditingRemarks] = useState<{ [key: string]: string }>({});
   const [selectedIssue, setSelectedIssue] = useState<Issue | null>(null);
@@ -72,6 +79,7 @@ export default function AllIssues() {
 
   const { departments, getDepartmentById } = useDepartments();
   const { adminInfo, isSuperAdmin, canAccessIssue } = useAdminAccess();
+  const { recalculateSeverity, calculating: severityCalculating } = useSeverityScoring();
 
   useEffect(() => {
     fetchIssues();
@@ -250,11 +258,21 @@ export default function AllIssues() {
       }
       return true;
     })
+    .filter((i) => {
+      if (severityFilter === 'all') return true;
+      return i.ai_severity_level === severityFilter;
+    })
     .filter((i) => 
       searchQuery === '' || 
       i.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
       userProfiles[i.user_id]?.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    )
+    .sort((a, b) => {
+      if (sortBy === 'severity') {
+        return (b.ai_severity_score || 0) - (a.ai_severity_score || 0);
+      }
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    });
 
   const uniqueCategories = Array.from(new Set(issues.map((i) => i.category)));
   const overdueCount = issues.filter(i => 
@@ -263,6 +281,7 @@ export default function AllIssues() {
     new Date(i.sla_deadline) < new Date()
   ).length;
   const escalatedCount = issues.filter(i => i.escalated).length;
+  const criticalCount = issues.filter(i => i.ai_severity_level === 'critical').length;
 
   return (
     <div className="flex min-h-screen bg-background">
@@ -276,7 +295,13 @@ export default function AllIssues() {
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
               <div>
                 <h1 className="text-3xl font-bold">All Issues</h1>
-                <div className="flex gap-2 mt-2">
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {criticalCount > 0 && (
+                    <Badge variant="outline" className="bg-destructive/15 text-destructive border-destructive/30 animate-pulse">
+                      <Brain className="h-3 w-3 mr-1" />
+                      {criticalCount} Critical
+                    </Badge>
+                  )}
                   {overdueCount > 0 && (
                     <Badge variant="outline" className="bg-destructive/10 text-destructive border-destructive/20">
                       {overdueCount} Overdue
@@ -347,6 +372,29 @@ export default function AllIssues() {
                     <SelectItem value="overdue">Overdue</SelectItem>
                   </SelectContent>
                 </Select>
+
+                <Select value={severityFilter} onValueChange={setSeverityFilter}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Severity" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Severity</SelectItem>
+                    <SelectItem value="critical">🔴 Critical</SelectItem>
+                    <SelectItem value="high">🟠 High</SelectItem>
+                    <SelectItem value="medium">🟡 Medium</SelectItem>
+                    <SelectItem value="low">🟢 Low</SelectItem>
+                  </SelectContent>
+                </Select>
+
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-[140px]">
+                    <SelectValue placeholder="Sort by" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="date">Newest First</SelectItem>
+                    <SelectItem value="severity">Highest Severity</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
@@ -394,7 +442,11 @@ export default function AllIssues() {
                         <Card 
                           key={issue.id} 
                           className={`shadow-soft hover:shadow-medium transition-all ${
-                            issue.escalated ? 'border-l-4 border-l-warning' : ''
+                            issue.ai_severity_level === 'critical' 
+                              ? 'border-l-4 border-l-destructive' 
+                              : issue.escalated 
+                                ? 'border-l-4 border-l-warning' 
+                                : ''
                           }`}
                         >
                           <CardContent className="p-6">
@@ -420,6 +472,12 @@ export default function AllIssues() {
                                     </p>
                                   </div>
                                   <div className="flex flex-wrap gap-2">
+                                    <SeverityBadge 
+                                      score={issue.ai_severity_score} 
+                                      level={issue.ai_severity_level}
+                                      reasoning={issue.ai_severity_reasoning}
+                                      showScore
+                                    />
                                     {getStatusBadge(issue.status)}
                                     <DepartmentBadge department={department || null} />
                                     <SLABadge 
@@ -561,6 +619,19 @@ export default function AllIssues() {
                                     className="bg-success/10 hover:bg-success/20 text-success border-success/20"
                                   >
                                     Mark Resolved
+                                  </Button>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={async () => {
+                                      const result = await recalculateSeverity(issue.id);
+                                      if (result) fetchIssues();
+                                    }}
+                                    disabled={severityCalculating}
+                                    className="bg-muted hover:bg-muted/80"
+                                  >
+                                    <RefreshCw className={`h-3 w-3 mr-1 ${severityCalculating ? 'animate-spin' : ''}`} />
+                                    AI Score
                                   </Button>
                                 </div>
                               </div>
