@@ -19,6 +19,7 @@ import { AnonymousReportToggle } from '@/components/verification/AnonymousReport
 import { VerificationBadge } from '@/components/verification/VerificationBadge';
 import { useUserVerification } from '@/hooks/useUserVerification';
 import { useLegalRules } from '@/hooks/useLegalRules';
+import { useSeverityScoring } from '@/hooks/useSeverityScoring';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Separator } from '@/components/ui/separator';
 
@@ -50,9 +51,10 @@ export default function ReportIssue() {
   const [showDuplicateWarning, setShowDuplicateWarning] = useState(false);
   const [bypassDuplicateCheck, setBypassDuplicateCheck] = useState(false);
   
-  // Verification and legal rules hooks
+  // Verification, legal rules, and severity hooks
   const { verification, isVerified, trustScore } = useUserVerification();
   const { rules: legalRules } = useLegalRules(formData.category || undefined);
+  const { calculateSeverity } = useSeverityScoring();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -187,6 +189,13 @@ export default function ReportIssue() {
           console.error('Failed to create admin notifications:', err);
         }
       }
+
+      // Trigger AI severity scoring in background (non-blocking)
+      calculateSeverity(newIssue.id).then(result => {
+        if (result) {
+          console.log('AI Severity:', result.severity_level, result.severity_score);
+        }
+      }).catch(err => console.error('Severity calculation failed:', err));
 
       toast.success('Issue reported successfully!');
       navigate('/dashboard');

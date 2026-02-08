@@ -8,8 +8,9 @@ import StatsCards from '@/components/admin/StatsCards';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { SeverityBadge } from '@/components/admin/SeverityBadge';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
-import { TrendingUp } from 'lucide-react';
+import { TrendingUp, Brain, AlertOctagon } from 'lucide-react';
 
 interface Stats {
   total: number;
@@ -17,6 +18,11 @@ interface Stats {
   inProgress: number;
   resolved: number;
   totalUsers: number;
+  critical: number;
+  high: number;
+  medium: number;
+  low: number;
+  unscored: number;
 }
 
 interface CategoryData {
@@ -25,6 +31,7 @@ interface CategoryData {
 }
 
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8'];
+const SEVERITY_COLORS = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#94a3b8'];
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -35,6 +42,11 @@ export default function AdminDashboard() {
     inProgress: 0,
     resolved: 0,
     totalUsers: 0,
+    critical: 0,
+    high: 0,
+    medium: 0,
+    low: 0,
+    unscored: 0,
   });
   const [categoryData, setCategoryData] = useState<CategoryData[]>([]);
   const [recentIssues, setRecentIssues] = useState<any[]>([]);
@@ -65,12 +77,24 @@ export default function AdminDashboard() {
         .from('profiles')
         .select('*', { count: 'exact', head: true });
 
+      // Severity counts
+      const critical = issues?.filter(i => i.ai_severity_level === 'critical').length || 0;
+      const high = issues?.filter(i => i.ai_severity_level === 'high').length || 0;
+      const medium = issues?.filter(i => i.ai_severity_level === 'medium').length || 0;
+      const low = issues?.filter(i => i.ai_severity_level === 'low').length || 0;
+      const unscored = issues?.filter(i => !i.ai_severity_level).length || 0;
+
       setStats({
         total,
         pending,
         inProgress,
         resolved,
         totalUsers: userCount || 0,
+        critical,
+        high,
+        medium,
+        low,
+        unscored,
       });
 
       // Calculate category data for charts
@@ -168,6 +192,46 @@ export default function AdminDashboard() {
                 totalUsers={stats.totalUsers}
               />
 
+              {/* AI Severity Overview */}
+              {(stats.critical > 0 || stats.high > 0) && (
+                <Card className="shadow-soft border-destructive/20">
+                  <CardContent className="pt-6">
+                    <h3 className="text-lg font-semibold mb-3 flex items-center gap-2">
+                      <AlertOctagon className="h-5 w-5 text-destructive" />
+                      AI Severity Alerts
+                    </h3>
+                    <div className="flex flex-wrap gap-3">
+                      {stats.critical > 0 && (
+                        <div className="flex items-center gap-2 p-3 rounded-lg bg-destructive/10 border border-destructive/20">
+                          <span className="text-2xl font-bold text-destructive">{stats.critical}</span>
+                          <span className="text-sm text-destructive">Critical Issues</span>
+                        </div>
+                      )}
+                      {stats.high > 0 && (
+                        <div className="flex items-center gap-2 p-3 rounded-lg bg-orange-500/10 border border-orange-500/20">
+                          <span className="text-2xl font-bold text-orange-600 dark:text-orange-400">{stats.high}</span>
+                          <span className="text-sm text-orange-600 dark:text-orange-400">High Severity</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2 p-3 rounded-lg bg-warning/10 border border-warning/20">
+                        <span className="text-2xl font-bold text-warning">{stats.medium}</span>
+                        <span className="text-sm text-warning">Medium</span>
+                      </div>
+                      <div className="flex items-center gap-2 p-3 rounded-lg bg-success/10 border border-success/20">
+                        <span className="text-2xl font-bold text-success">{stats.low}</span>
+                        <span className="text-sm text-success">Low</span>
+                      </div>
+                      {stats.unscored > 0 && (
+                        <div className="flex items-center gap-2 p-3 rounded-lg bg-muted border">
+                          <span className="text-2xl font-bold text-muted-foreground">{stats.unscored}</span>
+                          <span className="text-sm text-muted-foreground">Unscored</span>
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+
               {/* Charts Section */}
               <div className="grid gap-6 md:grid-cols-2">
                 {/* Bar Chart - Issues by Category */}
@@ -190,7 +254,44 @@ export default function AdminDashboard() {
                   </CardContent>
                 </Card>
 
-                {/* Pie Chart - Status Distribution */}
+                {/* Pie Chart - Severity Distribution */}
+                <Card className="shadow-soft">
+                  <CardContent className="pt-6">
+                    <h3 className="text-lg font-semibold mb-4 flex items-center gap-2">
+                      <Brain className="h-5 w-5" />
+                      AI Severity Distribution
+                    </h3>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={[
+                            { name: 'Critical', value: stats.critical },
+                            { name: 'High', value: stats.high },
+                            { name: 'Medium', value: stats.medium },
+                            { name: 'Low', value: stats.low },
+                            { name: 'Unscored', value: stats.unscored },
+                          ].filter(d => d.value > 0)}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`}
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                        >
+                          {[0, 1, 2, 3, 4].map((index) => (
+                            <Cell key={`cell-severity-${index}`} fill={SEVERITY_COLORS[index % SEVERITY_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {/* Status Distribution Chart */}
+              <div className="grid gap-6 md:grid-cols-2">
                 <Card className="shadow-soft">
                   <CardContent className="pt-6">
                     <h3 className="text-lg font-semibold mb-4">Status Distribution</h3>
@@ -237,6 +338,7 @@ export default function AdminDashboard() {
                         <tr className="border-b bg-muted/50">
                           <th className="p-3 text-left text-sm font-medium">Title</th>
                           <th className="p-3 text-left text-sm font-medium">Category</th>
+                          <th className="p-3 text-left text-sm font-medium">Severity</th>
                           <th className="p-3 text-left text-sm font-medium">Location</th>
                           <th className="p-3 text-left text-sm font-medium">Status</th>
                           <th className="p-3 text-left text-sm font-medium">Date</th>
@@ -244,10 +346,20 @@ export default function AdminDashboard() {
                       </thead>
                       <tbody>
                         {recentIssues.map((issue) => (
-                          <tr key={issue.id} className="border-b hover:bg-muted/30 transition-colors">
+                          <tr key={issue.id} className={`border-b hover:bg-muted/30 transition-colors ${
+                            issue.ai_severity_level === 'critical' ? 'bg-destructive/5' : ''
+                          }`}>
                             <td className="p-3 text-sm font-medium">{issue.title}</td>
                             <td className="p-3 text-sm">
                               <Badge variant="outline">{issue.category}</Badge>
+                            </td>
+                            <td className="p-3 text-sm">
+                              <SeverityBadge 
+                                score={issue.ai_severity_score} 
+                                level={issue.ai_severity_level}
+                                reasoning={issue.ai_severity_reasoning}
+                                compact
+                              />
                             </td>
                             <td className="p-3 text-sm text-muted-foreground">
                               {issue.area || 'N/A'}
