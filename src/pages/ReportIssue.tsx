@@ -9,7 +9,9 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { MapPin, Upload, X, Camera, Shield, Info } from 'lucide-react';
+import { MapPin, Upload, X, Camera, Shield, Info, CheckCircle, XCircle, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
 import { uploadToCloudinary } from '@/lib/cloudinary';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { IssueFormSchema } from '@/lib/validation';
@@ -20,8 +22,9 @@ import { VerificationBadge } from '@/components/verification/VerificationBadge';
 import { useUserVerification } from '@/hooks/useUserVerification';
 import { useLegalRules } from '@/hooks/useLegalRules';
 import { useSeverityScoring } from '@/hooks/useSeverityScoring';
+import { useImageValidation } from '@/hooks/useImageValidation';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Separator } from '@/components/ui/separator';
+import { Badge } from '@/components/ui/badge';
 
 export default function ReportIssue() {
   const { t } = useTranslation();
@@ -55,6 +58,7 @@ export default function ReportIssue() {
   const { verification, isVerified, trustScore } = useUserVerification();
   const { rules: legalRules } = useLegalRules(formData.category || undefined);
   const { calculateSeverity } = useSeverityScoring();
+  const { validateImage, validating: imageValidating, result: imageValidationResult, clearResult: clearImageResult } = useImageValidation();
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -216,6 +220,17 @@ export default function ReportIssue() {
       const urls = await Promise.all(uploadPromises);
       setUploadedImages(prev => [...prev, ...urls]);
       toast.success(`${urls.length} image(s) uploaded`);
+      
+      // Auto-validate first uploaded image with AI
+      if (urls[0] && formData.category) {
+        validateImage(urls[0], formData.category).then(result => {
+          if (result && !result.is_valid) {
+            toast.warning(`Image flagged: ${result.rejection_reason || 'May not match the reported issue'}. You can re-upload a clearer photo.`);
+          } else if (result?.is_valid) {
+            toast.success('Image validated by AI ✓');
+          }
+        });
+      }
     } catch (error: any) {
       console.error('Upload error:', error);
       toast.error(error.message || 'Failed to upload images');
@@ -282,6 +297,17 @@ export default function ReportIssue() {
       const url = await uploadToCloudinary(file);
       setUploadedImages(prev => [...prev, url]);
       toast.success('Photo captured');
+      
+      // Auto-validate captured image
+      if (formData.category) {
+        validateImage(url, formData.category).then(result => {
+          if (result && !result.is_valid) {
+            toast.warning(`Image flagged: ${result.rejection_reason || 'May not match the issue'}. Consider re-taking.`);
+          } else if (result?.is_valid) {
+            toast.success('Image validated by AI ✓');
+          }
+        });
+      }
     } catch (err: any) {
       console.error('Capture error:', err);
       toast.error(err?.message || 'Failed to capture photo');
@@ -528,15 +554,57 @@ export default function ReportIssue() {
                     </div>
                   )}
                   {uploadedImages.length > 0 && (
-                    <div className="mt-3 flex gap-2 flex-wrap">
-                      {uploadedImages.map((url, index) => (
-                        <div key={index} className="relative group">
-                          <img src={url} alt={`Upload ${index + 1}`} className="h-20 w-20 object-cover rounded-lg border" />
-                          <button type="button" onClick={() => removeImage(index)} className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                            <X className="h-3 w-3" />
-                          </button>
+                    <div className="mt-3 space-y-3">
+                      <div className="flex gap-2 flex-wrap">
+                        {uploadedImages.map((url, index) => (
+                          <div key={index} className="relative group">
+                            <img src={url} alt={`Upload ${index + 1}`} className="h-20 w-20 object-cover rounded-lg border" />
+                            <button type="button" onClick={() => { removeImage(index); clearImageResult(); }} className="absolute -top-2 -right-2 bg-destructive text-destructive-foreground rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <X className="h-3 w-3" />
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+
+                      {/* AI Image Validation Status */}
+                      {imageValidating && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          <span>AI is validating your image...</span>
                         </div>
-                      ))}
+                      )}
+                      {imageValidationResult && !imageValidating && (
+                        <div className={cn(
+                          "p-3 rounded-lg border text-sm",
+                          imageValidationResult.is_valid 
+                            ? "bg-success/10 border-success/30" 
+                            : "bg-destructive/10 border-destructive/30"
+                        )}>
+                          <div className="flex items-center gap-2">
+                            {imageValidationResult.is_valid 
+                              ? <CheckCircle className="h-4 w-4 text-success" />
+                              : <XCircle className="h-4 w-4 text-destructive" />
+                            }
+                            <span className="font-medium">
+                              {imageValidationResult.is_valid ? 'Image Validated' : 'Image Flagged'}
+                            </span>
+                            <Badge variant="outline" className="text-xs">
+                              {Math.round(imageValidationResult.confidence * 100)}% confidence
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-1">{imageValidationResult.description}</p>
+                          {!imageValidationResult.is_valid && imageValidationResult.rejection_reason && (
+                            <p className="text-xs text-destructive mt-1">
+                              Reason: {imageValidationResult.rejection_reason.replace(/_/g, ' ')} — Please upload a clear photo of the actual issue.
+                            </p>
+                          )}
+                          {!imageValidationResult.category_match && imageValidationResult.is_valid && (
+                            <p className="text-xs text-warning mt-1">
+                              ⚠️ Image may not match the selected category. Please verify.
+                            </p>
+                          )}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
