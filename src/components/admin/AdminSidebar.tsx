@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { LayoutDashboard, FileText, Users, BarChart3, Settings, LogOut, Building2, UserCog, Shield, Scale } from 'lucide-react';
+import { LayoutDashboard, FileText, Users, BarChart3, Settings, LogOut, Building2, UserCog, Shield, Scale, Brain } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -17,6 +17,7 @@ const superAdminMenuItems = [
   { title: 'Manage Admins', url: '/admin/manage-admins', icon: Users, showBadge: false },
   { title: 'User Verification', url: '/admin/verification', icon: Shield, showBadge: false },
   { title: 'Legal Rules', url: '/admin/legal-rules', icon: Scale, showBadge: false },
+  { title: 'Forecasting', url: '/admin/forecasting', icon: Brain, showBadge: false },
   { title: 'Settings', url: '/admin/settings', icon: Settings, showBadge: false },
 ];
 

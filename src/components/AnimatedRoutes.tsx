@@ -28,6 +28,7 @@ const ManageWorkers = lazy(() => import('@/pages/admin/ManageWorkers'));
 const Settings = lazy(() => import('@/pages/admin/Settings'));
 const LegalRulesAdmin = lazy(() => import('@/pages/admin/LegalRulesAdmin'));
 const UserVerificationAdmin = lazy(() => import('@/pages/admin/UserVerificationAdmin'));
+const Forecasting = lazy(() => import('@/pages/admin/Forecasting'));
 
 // Lazy loaded department pages
 const DepartmentDashboard = lazy(() => import('@/pages/department/DepartmentDashboard'));
@@ -146,6 +147,11 @@ export const AnimatedRoutes = () => {
           <Route path="/admin/verification" element={
             <PageTransition>
               <AdminRoute><UserVerificationAdmin /></AdminRoute>
+            </PageTransition>
+          } />
+          <Route path="/admin/forecasting" element={
+            <PageTransition>
+              <AdminRoute><Forecasting /></AdminRoute>
             </PageTransition>
           } />
 
