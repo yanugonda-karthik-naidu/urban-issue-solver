@@ -52,6 +52,134 @@ export type Database = {
           },
         ]
       }
+      asset_repair_history: {
+        Row: {
+          after_photo_url: string | null
+          asset_id: string
+          before_photo_url: string | null
+          cost: number | null
+          created_at: string
+          description: string | null
+          id: string
+          issue_id: string | null
+          notes: string | null
+          repair_type: string
+          repaired_at: string | null
+          repaired_by: string | null
+        }
+        Insert: {
+          after_photo_url?: string | null
+          asset_id: string
+          before_photo_url?: string | null
+          cost?: number | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          issue_id?: string | null
+          notes?: string | null
+          repair_type: string
+          repaired_at?: string | null
+          repaired_by?: string | null
+        }
+        Update: {
+          after_photo_url?: string | null
+          asset_id?: string
+          before_photo_url?: string | null
+          cost?: number | null
+          created_at?: string
+          description?: string | null
+          id?: string
+          issue_id?: string | null
+          notes?: string | null
+          repair_type?: string
+          repaired_at?: string | null
+          repaired_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "asset_repair_history_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "asset_repair_history_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      assets: {
+        Row: {
+          area: string | null
+          asset_code: string
+          asset_type: Database["public"]["Enums"]["asset_type"]
+          created_at: string
+          department_id: string | null
+          description: string | null
+          district: string | null
+          id: string
+          installed_at: string | null
+          last_maintenance_at: string | null
+          latitude: number | null
+          longitude: number | null
+          metadata: Json | null
+          name: string
+          state: string | null
+          status: Database["public"]["Enums"]["asset_status"]
+          updated_at: string
+        }
+        Insert: {
+          area?: string | null
+          asset_code: string
+          asset_type?: Database["public"]["Enums"]["asset_type"]
+          created_at?: string
+          department_id?: string | null
+          description?: string | null
+          district?: string | null
+          id?: string
+          installed_at?: string | null
+          last_maintenance_at?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          metadata?: Json | null
+          name: string
+          state?: string | null
+          status?: Database["public"]["Enums"]["asset_status"]
+          updated_at?: string
+        }
+        Update: {
+          area?: string | null
+          asset_code?: string
+          asset_type?: Database["public"]["Enums"]["asset_type"]
+          created_at?: string
+          department_id?: string | null
+          description?: string | null
+          district?: string | null
+          id?: string
+          installed_at?: string | null
+          last_maintenance_at?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          metadata?: Json | null
+          name?: string
+          state?: string | null
+          status?: Database["public"]["Enums"]["asset_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "assets_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_logs: {
         Row: {
           action_type: string
@@ -243,6 +371,7 @@ export type Database = {
           ai_severity_reasoning: string | null
           ai_severity_score: number | null
           area: string | null
+          asset_id: string | null
           assigned_worker_id: string | null
           category: string
           compliance_status: string | null
@@ -283,6 +412,7 @@ export type Database = {
           ai_severity_reasoning?: string | null
           ai_severity_score?: number | null
           area?: string | null
+          asset_id?: string | null
           assigned_worker_id?: string | null
           category: string
           compliance_status?: string | null
@@ -323,6 +453,7 @@ export type Database = {
           ai_severity_reasoning?: string | null
           ai_severity_score?: number | null
           area?: string | null
+          asset_id?: string | null
           assigned_worker_id?: string | null
           category?: string
           compliance_status?: string | null
@@ -358,6 +489,13 @@ export type Database = {
             | null
         }
         Relationships: [
+          {
+            foreignKeyName: "issues_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "issues_assigned_worker_id_fkey"
             columns: ["assigned_worker_id"]
@@ -562,8 +700,84 @@ export type Database = {
         }
         Relationships: []
       }
+      worker_tasks: {
+        Row: {
+          after_photo_url: string | null
+          assigned_at: string
+          assigned_by: string | null
+          before_photo_url: string | null
+          completed_at: string | null
+          completion_latitude: number | null
+          completion_longitude: number | null
+          completion_verified: boolean | null
+          created_at: string
+          id: string
+          issue_id: string
+          notes: string | null
+          started_at: string | null
+          status: Database["public"]["Enums"]["worker_task_status"]
+          updated_at: string
+          verification_method: string | null
+          worker_id: string
+        }
+        Insert: {
+          after_photo_url?: string | null
+          assigned_at?: string
+          assigned_by?: string | null
+          before_photo_url?: string | null
+          completed_at?: string | null
+          completion_latitude?: number | null
+          completion_longitude?: number | null
+          completion_verified?: boolean | null
+          created_at?: string
+          id?: string
+          issue_id: string
+          notes?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["worker_task_status"]
+          updated_at?: string
+          verification_method?: string | null
+          worker_id: string
+        }
+        Update: {
+          after_photo_url?: string | null
+          assigned_at?: string
+          assigned_by?: string | null
+          before_photo_url?: string | null
+          completed_at?: string | null
+          completion_latitude?: number | null
+          completion_longitude?: number | null
+          completion_verified?: boolean | null
+          created_at?: string
+          id?: string
+          issue_id?: string
+          notes?: string | null
+          started_at?: string | null
+          status?: Database["public"]["Enums"]["worker_task_status"]
+          updated_at?: string
+          verification_method?: string | null
+          worker_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "worker_tasks_issue_id_fkey"
+            columns: ["issue_id"]
+            isOneToOne: false
+            referencedRelation: "issues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "worker_tasks_worker_id_fkey"
+            columns: ["worker_id"]
+            isOneToOne: false
+            referencedRelation: "workers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       workers: {
         Row: {
+          access_token: string | null
           assigned_area: string | null
           assigned_district: string | null
           created_at: string
@@ -574,6 +788,7 @@ export type Database = {
           phone: string | null
         }
         Insert: {
+          access_token?: string | null
           assigned_area?: string | null
           assigned_district?: string | null
           created_at?: string
@@ -584,6 +799,7 @@ export type Database = {
           phone?: string | null
         }
         Update: {
+          access_token?: string | null
           assigned_area?: string | null
           assigned_district?: string | null
           created_at?: string
@@ -643,6 +859,16 @@ export type Database = {
     }
     Enums: {
       admin_role: "super_admin" | "department_admin"
+      asset_status: "active" | "damaged" | "under_repair" | "decommissioned"
+      asset_type:
+        | "streetlight"
+        | "bin"
+        | "valve"
+        | "manhole"
+        | "pole"
+        | "bench"
+        | "sign"
+        | "other"
       department_type:
         | "roads"
         | "sanitation"
@@ -658,6 +884,12 @@ export type Database = {
         | "voter_id"
         | "municipal_id"
         | "admin_verified"
+      worker_task_status:
+        | "assigned"
+        | "in_progress"
+        | "completed"
+        | "verified"
+        | "rejected"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -786,6 +1018,17 @@ export const Constants = {
   public: {
     Enums: {
       admin_role: ["super_admin", "department_admin"],
+      asset_status: ["active", "damaged", "under_repair", "decommissioned"],
+      asset_type: [
+        "streetlight",
+        "bin",
+        "valve",
+        "manhole",
+        "pole",
+        "bench",
+        "sign",
+        "other",
+      ],
       department_type: [
         "roads",
         "sanitation",
@@ -802,6 +1045,13 @@ export const Constants = {
         "voter_id",
         "municipal_id",
         "admin_verified",
+      ],
+      worker_task_status: [
+        "assigned",
+        "in_progress",
+        "completed",
+        "verified",
+        "rejected",
       ],
     },
   },
