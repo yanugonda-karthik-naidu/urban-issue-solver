@@ -12,6 +12,26 @@ serve(async (req) => {
   }
 
   try {
+    // Auth check
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false },
+    });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const { issue_id } = await req.json();
     if (!issue_id) {
       return new Response(JSON.stringify({ error: "issue_id is required" }), {
@@ -20,7 +40,6 @@ serve(async (req) => {
       });
     }
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
     const lovableApiKey = Deno.env.get("LOVABLE_API_KEY")!;
 
@@ -41,7 +60,6 @@ serve(async (req) => {
       });
     }
 
-    // Count nearby similar reports
     const { data: nearbyCount } = await supabase.rpc("count_nearby_reports", {
       p_issue_id: issue_id,
       p_category: issue.category,
@@ -49,10 +67,8 @@ serve(async (req) => {
       p_area: issue.area || "",
     });
 
-    // Calculate hours since creation
     const hoursOpen = (Date.now() - new Date(issue.created_at).getTime()) / (1000 * 60 * 60);
 
-    // Check SLA breach
     let slaBreached = false;
     let hoursOverdue = 0;
     if (issue.sla_deadline && issue.status !== "resolved") {
@@ -63,7 +79,6 @@ serve(async (req) => {
       }
     }
 
-    // Build AI prompt for severity analysis
     const aiPrompt = `You are an AI urban issue severity analyzer for a government civic complaint platform. 
 Analyze this reported civic issue and compute a severity score from 0-100.
 
@@ -88,7 +103,6 @@ Analyze this reported civic issue and compute a severity score from 0-100.
 - Near schools, hospitals, highways, government buildings = HIGH (20-25)
 - Residential areas = MEDIUM (10-15)
 - Isolated/low-traffic zones = LOW (5-10)
-- Analyze the area/district name for clues about sensitivity
 
 ### Report Clustering (0-20 points)
 - 0 similar reports = 0 points
@@ -100,14 +114,10 @@ Analyze this reported civic issue and compute a severity score from 0-100.
 ### Time Urgency (0-25 points)
 - Category urgency: electricity/water > roads > sanitation > other
 - SLA breached adds 10-15 points
-- Hours open increases urgency gradually
-- Already escalated adds points based on level
 
 ### Impact Assessment (0-30 points)
 - Based on description: public safety risk, number of people affected
 - Infrastructure damage level
-- Environmental/health hazard
-- Economic impact
 
 ## Response Format (STRICT JSON only):
 {
@@ -119,15 +129,8 @@ Analyze this reported civic issue and compute a severity score from 0-100.
   "recommended_action": "<brief recommendation>"
 }
 
-Classification:
-- 76-100: critical
-- 51-75: high
-- 26-50: medium
-- 0-25: low
-
 Return ONLY valid JSON, no markdown.`;
 
-    // Call Lovable AI Gateway
     const aiResponse = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -149,18 +152,15 @@ Return ONLY valid JSON, no markdown.`;
 
       if (aiResponse.status === 429) {
         return new Response(JSON.stringify({ error: "Rate limit exceeded. Try again later." }), {
-          status: 429,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 429, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
       if (aiResponse.status === 402) {
         return new Response(JSON.stringify({ error: "AI credits exhausted. Please add credits." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
 
-      // Fallback: calculate severity without AI
       return await fallbackSeverity(supabase, issue, nearbyCount || 0, hoursOpen, slaBreached, hoursOverdue, issue_id);
     }
 
@@ -168,17 +168,14 @@ Return ONLY valid JSON, no markdown.`;
     const content = aiData.choices?.[0]?.message?.content;
 
     if (!content) {
-      console.error("No content from AI response");
       return await fallbackSeverity(supabase, issue, nearbyCount || 0, hoursOpen, slaBreached, hoursOverdue, issue_id);
     }
 
-    // Parse AI response - handle potential markdown wrapping
     let parsed;
     try {
       const cleaned = content.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
       parsed = JSON.parse(cleaned);
     } catch (e) {
-      console.error("Failed to parse AI response:", content);
       return await fallbackSeverity(supabase, issue, nearbyCount || 0, hoursOpen, slaBreached, hoursOverdue, issue_id);
     }
 
@@ -187,7 +184,6 @@ Return ONLY valid JSON, no markdown.`;
     const locationSensitivity = parsed.location_sensitivity || "medium";
     const reasoning = parsed.reasoning || "AI-analyzed severity assessment";
 
-    // Update the issue with severity data
     const { error: updateError } = await supabase
       .from("issues")
       .update({
@@ -200,19 +196,14 @@ Return ONLY valid JSON, no markdown.`;
       .eq("id", issue_id);
 
     if (updateError) {
-      console.error("Error updating issue severity:", updateError);
       return new Response(JSON.stringify({ error: "Failed to update issue" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // For CRITICAL issues, create instant admin alerts
     if (severityLevel === "critical") {
       await createCriticalAlerts(supabase, issue, severityScore, reasoning);
     }
-
-    console.log(`Severity calculated for issue ${issue_id}: ${severityScore} (${severityLevel})`);
 
     return new Response(
       JSON.stringify({
@@ -230,7 +221,7 @@ Return ONLY valid JSON, no markdown.`;
   } catch (error) {
     console.error("Error in calculate-severity:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
+      JSON.stringify({ error: "Internal server error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
@@ -245,7 +236,6 @@ function classifyScore(score: number): string {
 
 async function createCriticalAlerts(supabase: any, issue: any, score: number, reasoning: string) {
   try {
-    // Get all super admins and department admins
     const { data: admins } = await supabase
       .from("admins")
       .select("user_id")
@@ -262,79 +252,39 @@ async function createCriticalAlerts(supabase: any, issue: any, score: number, re
       issue_id: issue.id,
     }));
 
-    const { error } = await supabase.from("notifications").insert(notifications);
-    if (error) {
-      console.error("Error creating critical alerts:", error);
-    }
+    await supabase.from("notifications").insert(notifications);
   } catch (e) {
     console.error("Error in createCriticalAlerts:", e);
   }
 }
 
 async function fallbackSeverity(
-  supabase: any,
-  issue: any,
-  nearbyCount: number,
-  hoursOpen: number,
-  slaBreached: boolean,
-  hoursOverdue: number,
-  issue_id: string
+  supabase: any, issue: any, nearbyCount: number, hoursOpen: number,
+  slaBreached: boolean, hoursOverdue: number, issue_id: string
 ) {
-  // Rule-based fallback when AI is unavailable
-  let score = 30; // Base score
-
-  // Category urgency
+  let score = 30;
   const categoryScores: Record<string, number> = {
-    electricity: 15,
-    water: 15,
-    roads: 10,
-    sanitation: 8,
-    traffic: 12,
-    other: 5,
+    electricity: 15, water: 15, roads: 10, sanitation: 8, traffic: 12, other: 5,
   };
   score += categoryScores[issue.category] || 5;
-
-  // Similar reports
   score += Math.min(nearbyCount * 3, 20);
-
-  // Time factor
   if (hoursOpen > 72) score += 10;
   else if (hoursOpen > 48) score += 7;
   else if (hoursOpen > 24) score += 4;
-
-  // SLA breach
   if (slaBreached) score += Math.min(Math.round(hoursOverdue / 4), 15);
-
-  // Escalation
   score += (issue.escalation_level || 0) * 5;
-
-  // Anonymous penalty
   if (issue.is_anonymous) score -= 5;
-
   score = Math.max(0, Math.min(100, score));
   const level = classifyScore(score);
 
-  const { error } = await supabase
-    .from("issues")
-    .update({
-      ai_severity_score: score,
-      ai_severity_level: level,
-      ai_severity_reasoning: "Rule-based severity calculation (AI fallback)",
-      location_sensitivity_zone: "medium",
-      nearby_reports_count: nearbyCount,
-    })
-    .eq("id", issue_id);
-
-  if (error) console.error("Fallback update error:", error);
+  await supabase.from("issues").update({
+    ai_severity_score: score, ai_severity_level: level,
+    ai_severity_reasoning: "Rule-based severity calculation (AI fallback)",
+    location_sensitivity_zone: "medium", nearby_reports_count: nearbyCount,
+  }).eq("id", issue_id);
 
   return new Response(
-    JSON.stringify({
-      success: true,
-      severity_score: score,
-      severity_level: level,
-      reasoning: "Rule-based severity calculation (AI unavailable)",
-      fallback: true,
-    }),
-    { headers: { "Access-Control-Allow-Origin": "*", "Content-Type": "application/json" } }
+    JSON.stringify({ success: true, severity_score: score, severity_level: level, reasoning: "Rule-based severity calculation (AI unavailable)", fallback: true }),
+    { headers: { ...corsHeaders, "Content-Type": "application/json" } }
   );
 }

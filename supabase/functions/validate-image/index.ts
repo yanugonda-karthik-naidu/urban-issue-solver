@@ -10,6 +10,26 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
+    // Auth check
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false },
+    });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const { image_url, category, issue_id } = await req.json();
     if (!image_url) throw new Error("image_url is required");
 
@@ -58,9 +78,6 @@ Respond with this exact JSON format:
     });
 
     if (!response.ok) {
-      const errText = await response.text();
-      console.error("AI gateway error:", response.status, errText);
-      // Return a permissive fallback so users aren't blocked
       return new Response(JSON.stringify({
         is_valid: true, confidence: 0.5, detected_type: "unknown",
         category_match: true, rejection_reason: null,
@@ -70,8 +87,7 @@ Respond with this exact JSON format:
 
     const aiData = await response.json();
     const content = aiData.choices?.[0]?.message?.content || "";
-    
-    // Extract JSON from response
+
     let result;
     try {
       const jsonMatch = content.match(/\{[\s\S]*\}/);
@@ -88,11 +104,9 @@ Respond with this exact JSON format:
       }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // If issue_id provided, update the issue record
     if (issue_id) {
-      const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-      const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-      const supabase = createClient(supabaseUrl, supabaseKey);
+      const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+      const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
       await supabase.from("issues").update({
         image_validation_status: result.is_valid ? "valid" : "rejected",
@@ -106,7 +120,7 @@ Respond with this exact JSON format:
     });
   } catch (e) {
     console.error("validate-image error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
