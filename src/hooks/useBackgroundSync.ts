@@ -33,7 +33,7 @@ export const useBackgroundSync = (): BackgroundSyncState => {
   const [nextRetryAt, setNextRetryAt] = useState<Date | null>(null);
   const [isAutoRetryEnabled, setIsAutoRetryEnabled] = useState(true);
   const syncInProgressRef = useRef(false);
-  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const retryTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Update queue length
   const updateQueueLength = useCallback(async () => {

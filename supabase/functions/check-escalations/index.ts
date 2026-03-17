@@ -12,27 +12,42 @@ serve(async (req) => {
   }
 
   try {
+    // Auth check - require authenticated admin
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false },
+    });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const userId = claimsData.claims.sub;
+
+    // Verify admin role
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    const { data: isAdmin } = await supabase.rpc('is_admin', { check_user_id: userId });
+    if (!isAdmin) {
+      return new Response(JSON.stringify({ error: 'Forbidden: admin access required' }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
 
     console.log("Checking for issues that need escalation...");
 
-    // Get all unresolved issues that are past their SLA deadline
     const { data: overdueIssues, error: fetchError } = await supabase
       .from("issues")
-      .select(`
-        id, 
-        title, 
-        status, 
-        sla_deadline, 
-        escalated, 
-        escalation_level,
-        user_id,
-        department_id,
-        departments(name)
-      `)
+      .select(`id, title, status, sla_deadline, escalated, escalation_level, user_id, department_id, departments(name)`)
       .neq("status", "resolved")
       .not("sla_deadline", "is", null)
       .lt("sla_deadline", new Date().toISOString());
@@ -49,116 +64,62 @@ serve(async (req) => {
 
     for (const issue of overdueIssues || []) {
       const currentLevel = issue.escalation_level || 0;
-      
-      // Calculate hours overdue
       const deadline = new Date(issue.sla_deadline);
       const now = new Date();
       const hoursOverdue = (now.getTime() - deadline.getTime()) / (1000 * 60 * 60);
 
-      // Determine new escalation level based on hours overdue
       let newLevel = currentLevel;
-      if (hoursOverdue >= 72 && currentLevel < 3) {
-        newLevel = 3; // Critical
-      } else if (hoursOverdue >= 48 && currentLevel < 2) {
-        newLevel = 2; // Level 2
-      } else if (hoursOverdue >= 24 && currentLevel < 1) {
-        newLevel = 1; // Level 1
-      }
+      if (hoursOverdue >= 72 && currentLevel < 3) newLevel = 3;
+      else if (hoursOverdue >= 48 && currentLevel < 2) newLevel = 2;
+      else if (hoursOverdue >= 24 && currentLevel < 1) newLevel = 1;
 
       if (newLevel > currentLevel) {
-        // Update issue
         const { error: updateError } = await supabase
           .from("issues")
-          .update({
-            escalated: true,
-            escalation_level: newLevel,
-            escalated_at: new Date().toISOString(),
-          })
+          .update({ escalated: true, escalation_level: newLevel, escalated_at: new Date().toISOString() })
           .eq("id", issue.id);
 
-        if (updateError) {
-          console.error(`Error updating issue ${issue.id}:`, updateError);
-          continue;
-        }
+        if (updateError) { console.error(`Error updating issue ${issue.id}:`, updateError); continue; }
 
-        // Record escalation history
-        const { error: historyError } = await supabase
-          .from("escalation_history")
-          .insert({
-            issue_id: issue.id,
-            from_level: currentLevel,
-            to_level: newLevel,
-            reason: `Auto-escalated: ${Math.round(hoursOverdue)} hours overdue`,
-            escalated_by: "system",
-          });
+        await supabase.from("escalation_history").insert({
+          issue_id: issue.id, from_level: currentLevel, to_level: newLevel,
+          reason: `Auto-escalated: ${Math.round(hoursOverdue)} hours overdue`, escalated_by: "system",
+        });
 
-        if (historyError) {
-          console.error(`Error recording escalation history:`, historyError);
-        }
+        const { data: superAdmins } = await supabase.from("admins").select("user_id").eq("role", "super_admin");
+        const { data: deptAdmins } = await supabase.from("admins").select("user_id").eq("department_id", issue.department_id);
 
-        // Get super admins to notify
-        const { data: superAdmins } = await supabase
-          .from("admins")
-          .select("user_id")
-          .eq("role", "super_admin");
-
-        // Get department admins to notify
-        const { data: deptAdmins } = await supabase
-          .from("admins")
-          .select("user_id")
-          .eq("department_id", issue.department_id);
-
-        const adminUserIds = [
+        const uniqueAdminIds = [...new Set([
           ...(superAdmins?.map(a => a.user_id) || []),
           ...(deptAdmins?.map(a => a.user_id) || []),
-        ];
+        ])];
 
-        // Create unique notifications
-        const uniqueAdminIds = [...new Set(adminUserIds)];
         for (const adminUserId of uniqueAdminIds) {
           notifications.push({
             user_id: adminUserId,
             title: `Issue Escalated to Level ${newLevel}`,
             message: `"${issue.title}" is ${Math.round(hoursOverdue)} hours overdue and has been escalated.`,
-            type: "escalation",
-            issue_id: issue.id,
+            type: "escalation", issue_id: issue.id,
           });
         }
 
         escalatedIssues.push(issue.id);
-        console.log(`Escalated issue ${issue.id} from level ${currentLevel} to ${newLevel}`);
       }
     }
 
-    // Insert all notifications
     if (notifications.length > 0) {
-      const { error: notifError } = await supabase
-        .from("notifications")
-        .insert(notifications);
-
-      if (notifError) {
-        console.error("Error creating notifications:", notifError);
-      }
+      await supabase.from("notifications").insert(notifications);
     }
 
     return new Response(
-      JSON.stringify({
-        success: true,
-        escalatedCount: escalatedIssues.length,
-        escalatedIssues,
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      JSON.stringify({ success: true, escalatedCount: escalatedIssues.length, escalatedIssues }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error) {
     console.error("Error in check-escalations:", error);
     return new Response(
-      JSON.stringify({ error: error instanceof Error ? error.message : "Unknown error" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      JSON.stringify({ error: "Internal server error" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });

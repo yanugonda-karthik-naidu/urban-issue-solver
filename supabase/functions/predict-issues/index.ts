@@ -10,11 +10,38 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { forecast_days = 30 } = await req.json().catch(() => ({}));
-    
+    // Auth check - require authenticated admin
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
+
+    const supabaseAuth = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+      auth: { persistSession: false },
+    });
+
+    const token = authHeader.replace('Bearer ', '');
+    const { data: claimsData, error: claimsError } = await supabaseAuth.auth.getClaims(token);
+    if (claimsError || !claimsData?.claims) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const userId = claimsData.claims.sub;
+
+    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Verify admin role
+    const { data: isAdmin } = await supabase.rpc('is_admin', { check_user_id: userId });
+    if (!isAdmin) {
+      return new Response(JSON.stringify({ error: 'Forbidden: admin access required' }), { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    const { forecast_days = 30 } = await req.json().catch(() => ({}));
 
     // Fetch historical issues (last 6 months)
     const sixMonthsAgo = new Date();
@@ -62,11 +89,8 @@ serve(async (req) => {
       if (!s.lat && issue.latitude) { s.lat = issue.latitude; s.lng = issue.longitude; }
     }
 
-    // Calculate predictions using trend analysis
     const predictions = Object.entries(locationStats).map(([key, stats]) => {
       stats.avgSeverity = stats.total > 0 ? Math.round(stats.avgSeverity / stats.total) : 0;
-
-      // Monthly trend: is issue count increasing?
       const months = Object.entries(stats.monthly).sort((a, b) => a[0].localeCompare(b[0]));
       let trend: "increasing" | "stable" | "decreasing" = "stable";
       if (months.length >= 2) {
@@ -78,11 +102,7 @@ serve(async (req) => {
         else if (avgRecent < avgOlder * 0.7) trend = "decreasing";
       }
 
-      // Dominant category
-      const topCategory = Object.entries(stats.categories)
-        .sort((a, b) => b[1] - a[1])[0];
-
-      // Risk score: combination of volume, trend, pending ratio, severity
+      const topCategory = Object.entries(stats.categories).sort((a, b) => b[1] - a[1])[0];
       const pendingRatio = stats.total > 0 ? stats.pending / stats.total : 0;
       const trendMultiplier = trend === "increasing" ? 1.5 : trend === "decreasing" ? 0.6 : 1;
       const riskScore = Math.min(100, Math.round(
@@ -94,7 +114,6 @@ serve(async (req) => {
       else if (riskScore >= 50) riskLevel = "high";
       else if (riskScore >= 25) riskLevel = "medium";
 
-      // Predicted issues in forecast window
       const monthlyAvg = stats.total / Math.max(1, months.length);
       const forecastMultiplier = trend === "increasing" ? 1.4 : trend === "decreasing" ? 0.7 : 1;
       const predictedCount = Math.round(monthlyAvg * (forecast_days / 30) * forecastMultiplier);
@@ -115,7 +134,6 @@ serve(async (req) => {
     .sort((a, b) => b.risk_score - a.risk_score)
     .slice(0, 20);
 
-    // Use AI for summary insight
     const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
     let aiSummary = "";
 
@@ -147,8 +165,7 @@ serve(async (req) => {
     }
 
     return new Response(JSON.stringify({
-      predictions,
-      forecast_days,
+      predictions, forecast_days,
       total_issues_analyzed: issues.length,
       ai_summary: aiSummary,
       generated_at: new Date().toISOString(),
@@ -157,7 +174,7 @@ serve(async (req) => {
     });
   } catch (e) {
     console.error("predict-issues error:", e);
-    return new Response(JSON.stringify({ error: e instanceof Error ? e.message : "Unknown error" }), {
+    return new Response(JSON.stringify({ error: "Internal server error" }), {
       status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
